@@ -18,8 +18,9 @@ async def start(message: types.Message):
         reply_markup=keyboard
     )
 
-@dp.message_handler(lambda message: message.text == "АРЕНДА")
-async def rent(message: types.Message):
+# ===== АРЕНДА =====
+
+async def send_rent(message: types.Message):
     button = types.InlineKeyboardButton(
         text="Перейти к аренде",
         url="https://t.me/commercial_sochi?search=%23аренда"
@@ -31,8 +32,20 @@ async def rent(message: types.Message):
         reply_markup=inline_kb
     )
 
-@dp.message_handler(lambda message: message.text == "ПРОДАЖА")
-async def sale(message: types.Message):
+
+@dp.message_handler(commands=["rent"])
+async def rent_command(message: types.Message):
+    await send_rent(message)
+
+
+@dp.message_handler(lambda message: message.text == "АРЕНДА")
+async def rent_button(message: types.Message):
+    await send_rent(message)
+
+
+# ===== ПРОДАЖА =====
+
+async def send_sale(message: types.Message):
     button = types.InlineKeyboardButton(
         text="Перейти к продаже",
         url="https://t.me/commercial_sochi?search=%23продажа"
@@ -43,6 +56,17 @@ async def sale(message: types.Message):
         "Объявления по продаже:",
         reply_markup=inline_kb
     )
+
+
+@dp.message_handler(commands=["sale"])
+async def sale_command(message: types.Message):
+    await send_sale(message)
+
+
+@dp.message_handler(lambda message: message.text == "ПРОДАЖА")
+async def sale_button(message: types.Message):
+    await send_sale(message)
+
 
 if __name__ == "__main__":
     executor.start_polling(dp, skip_updates=True)
