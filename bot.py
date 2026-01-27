@@ -77,7 +77,9 @@ async def channel_menu(message: types.Message):
         types.InlineKeyboardButton(
             text="Аренда коммерческой",
             url="https://t.me/commercial_sochi?search=%23аренда"
-        ),
+        )
+    )
+    keyboard.add(
         types.InlineKeyboardButton(
             text="Продажа коммерческой",
             url="https://t.me/commercial_sochi?search=%23продажа"
@@ -102,3 +104,4 @@ async def channel_menu(message: types.Message):
     
 if __name__ == "__main__":
     executor.start_polling(dp, skip_updates=True)
+
