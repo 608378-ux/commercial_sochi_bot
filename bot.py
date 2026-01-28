@@ -39,7 +39,7 @@ class AdForm(StatesGroup):
 @dp.message_handler(commands=["start"])
 async def start(message: types.Message):
     await message.answer(
-        "Добро пожаловать 👋\nВыберите действие:",
+        "Добро пожаловать! \nВыберите действие:",
         reply_markup=keyboard
     )
 
@@ -60,7 +60,7 @@ async def add_ad_start(message: types.Message):
 async def add_ad_type(message: types.Message, state: FSMContext):
     await state.update_data(type=message.text)
     await message.answer(
-        "Опишите объект:\nплощадь, район, этаж, цена"
+        "Опишите объект:\nплощадь, район, этаж, цена \nдобавьте описание"
     )
     await AdForm.description.set()
 
@@ -98,9 +98,9 @@ async def add_ad_contact(message: types.Message, state: FSMContext):
 async def contact_admin(message: types.Message):
     await message.answer(
         "📞 Контакты администратора:\n\n"
-        "Телефон: +7 9XX XXX-XX-XX\n"
-        "Telegram: https://t.me/username\n"
-        "Канал администратора: https://t.me/sochi_commerc"
+        "Телефон: +7 938 400-05-58\n"
+        "Telegram: https://t.me/Svetla_Sochi\n"
+       
     )
 
 
