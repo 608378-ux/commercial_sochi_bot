@@ -199,10 +199,10 @@ async def contact_admin(callback_query: types.CallbackQuery):
 async def show_chat_id(message: types.Message):
     print("CHAT ID:", message.chat.id)
 
-
 # =========================
 # ЗАПУСК
 # =========================
 
 if __name__ == "__main__":
     executor.start_polling(dp, skip_updates=True)
+
