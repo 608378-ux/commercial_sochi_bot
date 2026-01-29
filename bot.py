@@ -206,6 +206,9 @@ async def contact_admin(callback_query: types.CallbackQuery):
         "Telegram: https://t.me/Svetla_Sochi"
     )
 
+@dp.message_handler()
+async def show_chat_id(message: types.Message):
+    print("CHAT ID:", message.chat.id)
 
 # =========================
 # ЗАПУСК
@@ -213,3 +216,4 @@ async def contact_admin(callback_query: types.CallbackQuery):
 
 if __name__ == "__main__":
     executor.start_polling(dp, skip_updates=True)
+
