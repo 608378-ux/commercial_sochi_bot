@@ -41,7 +41,7 @@ async def start(message: types.Message):
     # deeplink из группы: ?start=post
     if message.get_args() == "post":
         await message.answer(
-            "Размещение объявления\n\n"
+            "✍️ Размещение объявления\n\n"
             "Пожалуйста, ответьте на несколько вопросов.",
             reply_markup=keyboard
         )
@@ -108,7 +108,7 @@ async def add_ad_contact(message: types.Message, state: FSMContext):
 @dp.message_handler(lambda m: m.text == "Связаться с администратором")
 async def contact_admin(message: types.Message):
     await message.answer(
-        "Контакты администратора:\n\n"
+        "📞 Контакты администратора:\n\n"
         "Телефон: +7 938 400-05-58\n"
         "Telegram: https://t.me/Svetla_Sochi\n"
        
@@ -179,7 +179,7 @@ async def post_stub(callback_query: types.CallbackQuery):
     await callback_query.answer()
 
     await callback_query.message.answer(
-        "Размещение объявления скоро будет доступно.\n\n"
+        "✍️ Размещение объявления скоро будет доступно.\n\n"
         "Пока вы можете связаться с администратором для публикации."
     )
 
@@ -189,31 +189,12 @@ async def contact_admin(callback_query: types.CallbackQuery):
     await callback_query.answer()
 
     await callback_query.message.answer(
-        "Контакты администратора:\n\n"
+        "📞 Контакты администратора:\n\n"
         "Телефон: +7 938 400-05-58\n"
         "Telegram: https://t.me/Svetla_Sochi"
     )
 
-import asyncio
-from aiogram import Bot
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-
-GROUP_ID = -1003844187449   # ✅ твой chat_id
-TOPIC_ID = 24              # тема "Разместить объявление"
-
-async def send_post_button_once():
-    bot = Bot(token=API_TOKEN, parse_mode="HTML")
-
-    keyboard = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(
-                    text="Разместить объявление",
-                    url="https://t.me/commercial_sochi_bot?start=post"
-                )
-            ]
-        ]
-    )
+    
 
     text = (
         "<b>РАЗМЕСТИТЬ ОБЪЯВЛЕНИЕ</b>\n\n"
@@ -241,8 +222,10 @@ async def send_post_button_once():
 # ЗАПУСК
 # =========================
 
-asyncio.get_event_loop().run_until_complete(send_post_button_once())
+# asyncio.get_event_loop().run_until_complete(send_post_button_once())
 
 if __name__ == "__main__":
     executor.start_polling(dp, skip_updates=True)
+
+
 
