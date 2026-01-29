@@ -135,9 +135,58 @@ async def rent(message: types.Message):
 
 
 # =========================
+# КНОПКИ В ТЕМЕ "РАЗМЕСТИТЬ ОБЪЯВЛЕНИЕ"
+# =========================
+
+@dp.message_handler(commands=["post"])
+async def post_entry(message: types.Message):
+    keyboard = types.InlineKeyboardMarkup(row_width=1)
+
+    btn_post = types.InlineKeyboardButton(
+        text="✍️ Разместить объявление",
+        callback_data="post_stub"
+    )
+
+    btn_contact = types.InlineKeyboardButton(
+        text="📞 Связаться с администратором",
+        callback_data="contact_admin"
+    )
+
+    keyboard.add(btn_post, btn_contact)
+
+    await message.answer(
+        "Выберите действие:",
+        reply_markup=keyboard
+    )
+
+# =========================
+# Обработчики ЗАГЛУШКИ и связи с админом
+# =========================
+
+@dp.callback_query_handler(lambda c: c.data == "post_stub")
+async def post_stub(callback_query: types.CallbackQuery):
+    await callback_query.answer()
+
+    await callback_query.message.answer(
+        "✍️ Размещение объявления скоро будет доступно.\n\n"
+        "Пока вы можете связаться с администратором для публикации."
+    )
+
+
+@dp.callback_query_handler(lambda c: c.data == "contact_admin")
+async def contact_admin(callback_query: types.CallbackQuery):
+    await callback_query.answer()
+
+    await callback_query.message.answer(
+        "📞 Контакты администратора:\n\n"
+        "Телефон: +7 938 400-05-58\n"
+        "Telegram: https://t.me/Svetla_Sochi"
+    )
+
+
+# =========================
 # ЗАПУСК
 # =========================
 
 if __name__ == "__main__":
     executor.start_polling(dp, skip_updates=True)
-
