@@ -37,30 +37,18 @@ class AdForm(StatesGroup):
 # =========================
 
 @dp.message_handler(commands=["start"])
-async def start(message: types.Message, state: FSMContext):
-    args = message.get_args()
-
-    # deeplink: разместить объявление
-    if args == "post":
+async def start(message: types.Message):
+    # deeplink из группы: ?start=post
+    if message.get_args() == "post":
         await message.answer(
-            "✍️ Давайте разместим объявление.\n\n"
-            "Что вы размещаете?\nНапишите: Аренда или Продажа"
+            "✍️ Размещение объявления\n\n"
+            "Пожалуйста, ответьте на несколько вопросов.",
+            reply_markup=keyboard
         )
         await AdForm.type.set()
         return
 
-    # deeplink: связаться с администратором
-    if args == "contact":
-        await message.answer(
-            "📞 Контакты администратора:\n\n"
-            "Телефон: +7 938 400-05-58\n"
-            "Telegram: https://t.me/Svetla_Sochi",
-            reply_markup=keyboard
-        )
-        return
-
-    # обычный старт
-    await state.finish()
+    # обычный запуск бота
     await message.answer(
         "Добро пожаловать!\nВыберите действие:",
         reply_markup=keyboard
@@ -166,12 +154,12 @@ async def post_entry(message: types.Message):
     keyboard = types.InlineKeyboardMarkup(row_width=1)
 
     btn_post = types.InlineKeyboardButton(
-        text="✍️ Разместить объявление",
+        text="Разместить объявление",
         callback_data="post_stub"
     )
 
     btn_contact = types.InlineKeyboardButton(
-        text="📞 Связаться с администратором",
+        text="Связаться с администратором",
         callback_data="contact_admin"
     )
 
@@ -206,9 +194,11 @@ async def contact_admin(callback_query: types.CallbackQuery):
         "Telegram: https://t.me/Svetla_Sochi"
     )
 
+
 @dp.message_handler()
 async def show_chat_id(message: types.Message):
     print("CHAT ID:", message.chat.id)
+
 
 # =========================
 # ЗАПУСК
@@ -216,4 +206,3 @@ async def show_chat_id(message: types.Message):
 
 if __name__ == "__main__":
     executor.start_polling(dp, skip_updates=True)
-
