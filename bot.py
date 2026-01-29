@@ -41,7 +41,7 @@ async def start(message: types.Message):
     # deeplink из группы: ?start=post
     if message.get_args() == "post":
         await message.answer(
-            "✍️ Размещение объявления\n\n"
+            "Размещение объявления\n\n"
             "Пожалуйста, ответьте на несколько вопросов.",
             reply_markup=keyboard
         )
@@ -108,7 +108,7 @@ async def add_ad_contact(message: types.Message, state: FSMContext):
 @dp.message_handler(lambda m: m.text == "Связаться с администратором")
 async def contact_admin(message: types.Message):
     await message.answer(
-        "📞 Контакты администратора:\n\n"
+        "Контакты администратора:\n\n"
         "Телефон: +7 938 400-05-58\n"
         "Telegram: https://t.me/Svetla_Sochi\n"
        
@@ -179,7 +179,7 @@ async def post_stub(callback_query: types.CallbackQuery):
     await callback_query.answer()
 
     await callback_query.message.answer(
-        "✍️ Размещение объявления скоро будет доступно.\n\n"
+        "Размещение объявления скоро будет доступно.\n\n"
         "Пока вы можете связаться с администратором для публикации."
     )
 
@@ -189,19 +189,59 @@ async def contact_admin(callback_query: types.CallbackQuery):
     await callback_query.answer()
 
     await callback_query.message.answer(
-        "📞 Контакты администратора:\n\n"
+        "Контакты администратора:\n\n"
         "Телефон: +7 938 400-05-58\n"
         "Telegram: https://t.me/Svetla_Sochi"
     )
 
+import asyncio
+from aiogram import Bot
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
-@dp.message_handler()
-async def show_chat_id(message: types.Message):
-    print("CHAT ID:", message.chat.id)
+GROUP_ID = -1003844187449   # ✅ твой chat_id
+TOPIC_ID = 24              # тема "Разместить объявление"
+
+async def send_post_button_once():
+    bot = Bot(token=API_TOKEN, parse_mode="HTML")
+
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="Разместить объявление",
+                    url="https://t.me/commercial_sochi_bot?start=post"
+                )
+            ]
+        ]
+    )
+
+    text = (
+        "<b>РАЗМЕСТИТЬ ОБЪЯВЛЕНИЕ</b>\n\n"
+        "В этой базе публикуются только проверенные объявления "
+        "о коммерческой недвижимости в Сочи.\n\n"
+        "Чтобы разместить объект:\n\n"
+        "1️⃣ Нажмите кнопку «Разместить объявление»\n"
+        "2️⃣ Заполните короткую форму\n"
+        "3️⃣ Объявление пройдёт модерацию\n\n"
+        "⛔️ Публикация объявлений напрямую в группе закрыта"
+    )
+
+    await bot.send_message(
+        chat_id=GROUP_ID,
+        message_thread_id=TOPIC_ID,
+        text=text,
+        reply_markup=keyboard
+    )
+
+    await bot.session.close()
+
+
 
 # =========================
 # ЗАПУСК
 # =========================
+
+asyncio.get_event_loop().run_until_complete(send_post_button_once())
 
 if __name__ == "__main__":
     executor.start_polling(dp, skip_updates=True)
