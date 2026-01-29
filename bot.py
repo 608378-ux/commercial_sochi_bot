@@ -37,9 +37,32 @@ class AdForm(StatesGroup):
 # =========================
 
 @dp.message_handler(commands=["start"])
-async def start(message: types.Message):
+async def start(message: types.Message, state: FSMContext):
+    args = message.get_args()
+
+    # deeplink: разместить объявление
+    if args == "post":
+        await message.answer(
+            "✍️ Давайте разместим объявление.\n\n"
+            "Что вы размещаете?\nНапишите: Аренда или Продажа"
+        )
+        await AdForm.type.set()
+        return
+
+    # deeplink: связаться с администратором
+    if args == "contact":
+        await message.answer(
+            "📞 Контакты администратора:\n\n"
+            "Телефон: +7 938 400-05-58\n"
+            "Telegram: https://t.me/Svetla_Sochi",
+            reply_markup=keyboard
+        )
+        return
+
+    # обычный старт
+    await state.finish()
     await message.answer(
-        "Добро пожаловать! \nВыберите действие:",
+        "Добро пожаловать!\nВыберите действие:",
         reply_markup=keyboard
     )
 
