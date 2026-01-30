@@ -80,7 +80,11 @@ async def add_ad_start(message: types.Message):
     )
     await AdForm.type.set()
 
-    @dp.callback_query_handler(lambda c: c.data in ["deal_sale", "deal_rent"], state=AdForm.type)
+
+@dp.callback_query_handler(
+    lambda c: c.data in ["deal_sale", "deal_rent"],
+    state=AdForm.type
+)
 async def process_deal_type(callback: types.CallbackQuery, state: FSMContext):
     deal_type = "Продажа" if callback.data == "deal_sale" else "Аренда"
 
@@ -149,6 +153,7 @@ async def rent(message: types.Message):
 
 if __name__ == "__main__":
     executor.start_polling(dp, skip_updates=True)
+
 
 
 
