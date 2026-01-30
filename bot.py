@@ -28,8 +28,15 @@ keyboard.add("АРЕНДА смотреть объявления")
 
 class AdForm(StatesGroup):
     type = State()
+    purpose = State()
+    area = State()
+    district = State()
+    address = State()
     description = State()
+    photos = State()
+    price = State()
     contact = State()
+
 
 # =========================
 # КЛАВИАТУРЫ ОПРОСНИКА
@@ -40,6 +47,23 @@ def deal_type_kb():
     kb.add(
         InlineKeyboardButton("Продажа", callback_data="deal_sale"),
         InlineKeyboardButton("Аренда", callback_data="deal_rent")
+    )
+    return kb
+
+# =========================
+# КЛАВИАТУРА Назначение объекта
+# =========================
+
+def purpose_kb():
+    kb = InlineKeyboardMarkup(row_width=2)
+    kb.add(
+        InlineKeyboardButton("Свободного назначения", callback_data="purpose_free"),
+        InlineKeyboardButton("Торговая площадь", callback_data="purpose_trade"),
+        InlineKeyboardButton("Офисная недвижимость", callback_data="purpose_office"),
+        InlineKeyboardButton("Гостиничная недвижимость", callback_data="purpose_hotel"),
+        InlineKeyboardButton("Склады", callback_data="purpose_warehouse"),
+        InlineKeyboardButton("Производственные помещения", callback_data="purpose_industrial"),
+        InlineKeyboardButton("Другое", callback_data="purpose_other"),
     )
     return kb
 
@@ -93,10 +117,41 @@ async def process_deal_type(callback: types.CallbackQuery, state: FSMContext):
 
     await callback.message.answer(
         f"Тип сделки: <b>{deal_type}</b>\n\n"
-        "Укажите назначение объекта.",
+        "Выберите назначение объекта:",
+        reply_markup=purpose_kb(),
         parse_mode="HTML"
     )
 
+    await AdForm.purpose.set()
+
+
+@dp.callback_query_handler(
+    lambda c: c.data.startswith("purpose_"),
+    state=AdForm.purpose
+)
+async def process_purpose(callback: types.CallbackQuery, state: FSMContext):
+    mapping = {
+        "purpose_free": "Свободного назначения",
+        "purpose_trade": "Торговая площадь",
+        "purpose_office": "Офисная недвижимость",
+        "purpose_hotel": "Гостиничная недвижимость",
+        "purpose_warehouse": "Склады",
+        "purpose_industrial": "Производственные помещения",
+        "purpose_other": "Другое",
+    }
+
+    purpose = mapping.get(callback.data)
+
+    await state.update_data(purpose=purpose)
+    await callback.answer()
+
+    await callback.message.answer(
+        f"Назначение: <b>{purpose}</b>\n\n"
+        "Укажите площадь объекта (в м²):",
+        parse_mode="HTML"
+    )
+
+    await AdForm.area.set()
 
 
 # =========================
@@ -153,9 +208,3 @@ async def rent(message: types.Message):
 
 if __name__ == "__main__":
     executor.start_polling(dp, skip_updates=True)
-
-
-
-
-
-
