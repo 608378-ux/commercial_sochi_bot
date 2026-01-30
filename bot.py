@@ -83,6 +83,14 @@ def district_kb():
     )
     return kb
 
+# =========================
+# Кнопка ГОТОВО
+# =========================    
+
+photos_done_kb = InlineKeyboardMarkup().add(
+    InlineKeyboardButton("Готово", callback_data="photos_done")
+)
+
 
 # =========================
 # /start
@@ -264,16 +272,57 @@ async def process_description(message: types.Message, state: FSMContext):
         )
         return
 
+    # СОХРАНЯЕМ ОПИСАНИЕ
     await state.update_data(description=description)
 
+    # ГОТОВИМ ХРАНИЛИЩЕ ФОТО
+    await state.update_data(photos=[])
+
+    # ПЕРЕХОД К ФОТО
     await message.answer(
-        "📸 Добавьте фото объекта (до 10 шт).\n\n"
-        "Прикрепляйте фото сообщениями.\n"
-        "Когда закончите — нажмите «Готово»."
+        "📸 Добавьте фото объекта (до 10 шт).\n"
+        "Можно отправлять по одному или несколько.\n\n"
+        "Когда закончите — нажмите «Готово».",
+        reply_markup=photos_done_kb
     )
 
     await AdForm.photos.set()
 
+
+
+@dp.message_handler(content_types=types.ContentType.PHOTO, state=AdForm.photos)
+async def process_photos(message: types.Message, state: FSMContext):
+    data = await state.get_data()
+    photos = data.get("photos", [])
+
+    if len(photos) >= 10:
+        await message.answer("⛔️ Можно добавить не более 10 фото.")
+        return
+
+    photo_id = message.photo[-1].file_id
+    photos.append(photo_id)
+
+    await state.update_data(photos=photos)
+
+    await message.answer(f"📸 Фото добавлено ({len(photos)}/10)")
+
+
+
+@dp.callback_query_handler(lambda c: c.data == "photos_done", state=AdForm.photos)
+async def photos_done(callback: types.CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+
+    if not data.get("photos"):
+        await callback.answer("Добавьте хотя бы одно фото", show_alert=True)
+        return
+
+    await callback.message.answer(
+        "💰 Укажите цену объекта:\n\n"
+        "• Продажа — ₽\n"
+        "• Аренда — ₽ / месяц"
+    )
+
+    await AdForm.price.set()
 
 
 # =========================
