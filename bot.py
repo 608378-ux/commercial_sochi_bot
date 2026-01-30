@@ -11,6 +11,15 @@ bot = Bot(token=API_TOKEN)
 storage = MemoryStorage()
 dp = Dispatcher(bot, storage=storage)
 
+
+
+photos_done_kb = ReplyKeyboardMarkup(
+    resize_keyboard=True
+)
+photos_done_kb.add("Готово")
+
+
+
 # =========================
 # НИЖНЕЕ МЕНЮ
 # =========================
@@ -20,13 +29,6 @@ keyboard.add("Разместить объявление")
 keyboard.add("Связаться с администратором")
 keyboard.add("ПРОДАЖА смотреть объявления")
 keyboard.add("АРЕНДА смотреть объявления")
-
-photos_done_kb = ReplyKeyboardMarkup(
-    resize_keyboard=True,
-    one_time_keyboard=False
-)
-photos_done_kb.add("Готово")
-
 
 
 # =========================
@@ -90,13 +92,7 @@ def district_kb():
     )
     return kb
 
-# =========================
-# Кнопка ГОТОВО
-# =========================    
 
-photos_done_kb = InlineKeyboardMarkup().add(
-    InlineKeyboardButton("Готово", callback_data="photos_done")
-)
 
 
 # =========================
@@ -260,40 +256,27 @@ async def process_address(message: types.Message, state: FSMContext):
     await AdForm.description.set()
 
 
-
 @dp.message_handler(state=AdForm.description)
 async def process_description(message: types.Message, state: FSMContext):
     description = message.text.strip()
 
     if len(description) > 500:
         await message.answer(
-            f"❗ Слишком длинное описание ({len(description)} символов).\n"
-            "Максимум — 500. Пожалуйста, сократите текст."
+            f"❗ Слишком длинное описание ({len(description)} символов)."
         )
         return
 
-    if len(description) < 10:
-        await message.answer(
-            "❗ Описание слишком короткое. "
-            "Пожалуйста, опишите объект подробнее."
-        )
-        return
-
-    # СОХРАНЯЕМ ОПИСАНИЕ
     await state.update_data(description=description)
-
-    # ГОТОВИМ ХРАНИЛИЩЕ ФОТО
     await state.update_data(photos=[])
 
-    # ПЕРЕХОД К ФОТО
     await message.answer(
         "📸 Добавьте фото объекта (до 10 шт).\n"
-        "Можно отправлять по одному или несколько.\n\n"
         "Когда закончите — нажмите «Готово».",
         reply_markup=photos_done_kb
     )
 
     await AdForm.photos.set()
+
 
 
 
@@ -334,21 +317,25 @@ async def photos_done(message: types.Message, state: FSMContext):
 
 
 
-@dp.callback_query_handler(lambda c: c.data == "photos_done", state=AdForm.photos)
-async def photos_done(callback: types.CallbackQuery, state: FSMContext):
+
+@dp.message_handler(lambda m: m.text == "Готово", state=AdForm.photos)
+async def photos_done(message: types.Message, state: FSMContext):
     data = await state.get_data()
 
     if not data.get("photos"):
-        await callback.answer("Добавьте хотя бы одно фото", show_alert=True)
+        await message.answer("❗ Добавьте хотя бы одно фото.")
         return
 
-    await callback.message.answer(
-        " Укажите цену объекта:\n\n"
-        "• Продажа — ₽\n"
-        "• Аренда — ₽ / месяц"
+    await message.answer(
+        "Укажите цену объекта:\n"
+        "Продажа — ₽\n"
+        "Аренда — ₽ / месяц",
+        reply_markup=types.ReplyKeyboardRemove()
     )
 
     await AdForm.price.set()
+
+
 
 
 # =========================
