@@ -31,6 +31,18 @@ class AdForm(StatesGroup):
     description = State()
     contact = State()
 
+# =========================
+# КЛАВИАТУРЫ ОПРОСНИКА
+# =========================
+
+def deal_type_kb():
+    kb = InlineKeyboardMarkup(row_width=2)
+    kb.add(
+        InlineKeyboardButton("Продажа", callback_data="deal_sale"),
+        InlineKeyboardButton("Аренда", callback_data="deal_rent")
+    )
+    return kb
+
 
 # =========================
 # /start
@@ -59,46 +71,28 @@ async def start(message: types.Message):
 # РАЗМЕСТИТЬ ОБЪЯВЛЕНИЕ
 # =========================
 
+
 @dp.message_handler(lambda m: m.text == "Разместить объявление")
 async def add_ad_start(message: types.Message):
     await message.answer(
-        "Что вы размещаете?\nНапишите: Аренда или Продажа"
+        "Выберите тип сделки:",
+        reply_markup=deal_type_kb()
     )
     await AdForm.type.set()
 
+    @dp.callback_query_handler(lambda c: c.data in ["deal_sale", "deal_rent"], state=AdForm.type)
+async def process_deal_type(callback: types.CallbackQuery, state: FSMContext):
+    deal_type = "Продажа" if callback.data == "deal_sale" else "Аренда"
 
-@dp.message_handler(state=AdForm.type)
-async def add_ad_type(message: types.Message, state: FSMContext):
-    await state.update_data(type=message.text)
-    await message.answer(
-        "Опишите объект:\nплощадь, район, этаж, цена \nдобавьте описание"
-    )
-    await AdForm.description.set()
+    await state.update_data(type=deal_type)
+    await callback.answer()
 
-
-@dp.message_handler(state=AdForm.description)
-async def add_ad_description(message: types.Message, state: FSMContext):
-    await state.update_data(description=message.text)
-    await message.answer(
-        "Оставьте контакт для связи (телефон или Telegram)"
-    )
-    await AdForm.contact.set()
-
-
-@dp.message_handler(state=AdForm.contact)
-async def add_ad_contact(message: types.Message, state: FSMContext):
-    data = await state.get_data()
-
-    text = (
-        "✅ Заявка на размещение получена\n\n"
-        f"Тип: {data['type']}\n"
-        f"Описание: {data['description']}\n"
-        f"Контакт: {message.text}\n\n"
-        "Администратор свяжется с вами."
+    await callback.message.answer(
+        f"Тип сделки: <b>{deal_type}</b>\n\n"
+        "Укажите назначение объекта.",
+        parse_mode="HTML"
     )
 
-    await message.answer(text, reply_markup=keyboard)
-    await state.finish()
 
 
 # =========================
@@ -145,77 +139,6 @@ async def rent(message: types.Message):
     await message.answer("Аренда коммерческой недвижимости:", reply_markup=kb)
 
 
-# =========================
-# КНОПКИ В ТЕМЕ "РАЗМЕСТИТЬ ОБЪЯВЛЕНИЕ"
-# =========================
-
-@dp.message_handler(commands=["post"])
-async def post_entry(message: types.Message):
-    keyboard = types.InlineKeyboardMarkup(row_width=1)
-
-    btn_post = types.InlineKeyboardButton(
-        text="Разместить объявление",
-        callback_data="post_stub"
-    )
-
-    btn_contact = types.InlineKeyboardButton(
-        text="Связаться с администратором",
-        callback_data="contact_admin"
-    )
-
-    keyboard.add(btn_post, btn_contact)
-
-    await message.answer(
-        "Выберите действие:",
-        reply_markup=keyboard
-    )
-
-# =========================
-# Обработчики ЗАГЛУШКИ и связи с админом
-# =========================
-
-@dp.callback_query_handler(lambda c: c.data == "post_stub")
-async def post_stub(callback_query: types.CallbackQuery):
-    await callback_query.answer()
-
-    await callback_query.message.answer(
-        "✍️ Размещение объявления скоро будет доступно.\n\n"
-        "Пока вы можете связаться с администратором для публикации."
-    )
-
-
-@dp.callback_query_handler(lambda c: c.data == "contact_admin")
-async def contact_admin(callback_query: types.CallbackQuery):
-    await callback_query.answer()
-
-    await callback_query.message.answer(
-        "📞 Контакты администратора:\n\n"
-        "Телефон: +7 938 400-05-58\n"
-        "Telegram: https://t.me/Svetla_Sochi"
-    )
-
-    
-
-    text = (
-        "<b>РАЗМЕСТИТЬ ОБЪЯВЛЕНИЕ</b>\n\n"
-        "В этой базе публикуются только проверенные объявления "
-        "о коммерческой недвижимости в Сочи.\n\n"
-        "Чтобы разместить объект:\n\n"
-        "1️⃣ Нажмите кнопку «Разместить объявление»\n"
-        "2️⃣ Заполните короткую форму\n"
-        "3️⃣ Объявление пройдёт модерацию\n\n"
-        "⛔️ Публикация объявлений напрямую в группе закрыта"
-    )
-
-    await bot.send_message(
-        chat_id=GROUP_ID,
-        message_thread_id=TOPIC_ID,
-        text=text,
-        reply_markup=keyboard
-    )
-
-    await bot.session.close()
-
 
 
 # =========================
@@ -226,6 +149,8 @@ async def contact_admin(callback_query: types.CallbackQuery):
 
 if __name__ == "__main__":
     executor.start_polling(dp, skip_updates=True)
+
+
 
 
 
