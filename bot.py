@@ -27,7 +27,7 @@ keyboard.add("АРЕНДА смотреть объявления")
 # =========================
 
 class AdForm(StatesGroup):
-    type = State()
+    deal_type = State()
     purpose = State()
     area = State()
     district = State()
@@ -97,7 +97,7 @@ async def start(message: types.Message):
             "Пожалуйста, ответьте на несколько вопросов.",
             reply_markup=keyboard
         )
-        await AdForm.type.set()
+        await AdForm.deal_type.set()
         return
 
     # обычный запуск бота
@@ -118,12 +118,12 @@ async def add_ad_start(message: types.Message):
         "Выберите тип сделки:",
         reply_markup=deal_type_kb()
     )
-    await AdForm.type.set()
+    await AdForm.deal_type.set()
 
 
 @dp.callback_query_handler(
     lambda c: c.data in ["deal_sale", "deal_rent"],
-    state=AdForm.type
+    state=AdForm.deal_type
 )
 async def process_deal_type(callback: types.CallbackQuery, state: FSMContext):
     deal_type = "Продажа" if callback.data == "deal_sale" else "Аренда"
@@ -222,6 +222,57 @@ async def process_district(callback: types.CallbackQuery, state: FSMContext):
     )
 
     await AdForm.address.set()
+
+
+@dp.message_handler(state=AdForm.address)
+async def process_address(message: types.Message, state: FSMContext):
+    address = message.text.strip()
+
+    if len(address) < 5:
+        await message.answer("❗ Пожалуйста, укажите корректный адрес.")
+        return
+
+    await state.update_data(address=address)
+
+    await message.answer(
+        "Введите описание объекта (до 500 символов):\n\n"
+        "ℹ️ Можно указать:\n"
+        "— состояние\n"
+        "— планировку\n"
+        "— особенности объекта"
+    )
+
+    await AdForm.description.set()
+
+
+
+@dp.message_handler(state=AdForm.description)
+async def process_description(message: types.Message, state: FSMContext):
+    description = message.text.strip()
+
+    if len(description) > 500:
+        await message.answer(
+            f"❗ Слишком длинное описание ({len(description)} символов).\n"
+            "Максимум — 500. Пожалуйста, сократите текст."
+        )
+        return
+
+    if len(description) < 10:
+        await message.answer(
+            "❗ Описание слишком короткое. "
+            "Пожалуйста, опишите объект подробнее."
+        )
+        return
+
+    await state.update_data(description=description)
+
+    await message.answer(
+        "📸 Добавьте фото объекта (до 10 шт).\n\n"
+        "Прикрепляйте фото сообщениями.\n"
+        "Когда закончите — нажмите «Готово»."
+    )
+
+    await AdForm.photos.set()
 
 
 
