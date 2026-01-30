@@ -67,6 +67,22 @@ def purpose_kb():
     )
     return kb
 
+# =========================
+# КЛАВИАТУРА Район
+# =========================
+
+def district_kb():
+    kb = InlineKeyboardMarkup(row_width=2)
+    kb.add(
+        InlineKeyboardButton("Адлерский", callback_data="district_adler"),
+        InlineKeyboardButton("Хостинский", callback_data="district_khosta"),
+        InlineKeyboardButton("Лазаревский", callback_data="district_lazarev"),
+        InlineKeyboardButton("Центральный", callback_data="district_center"),
+        InlineKeyboardButton("Сириус", callback_data="district_sirius"),
+        InlineKeyboardButton("Красная Поляна", callback_data="district_polana"),
+    )
+    return kb
+
 
 # =========================
 # /start
@@ -152,6 +168,61 @@ async def process_purpose(callback: types.CallbackQuery, state: FSMContext):
     )
 
     await AdForm.area.set()
+
+
+
+@dp.message_handler(state=AdForm.area)
+async def process_area(message: types.Message, state: FSMContext):
+    area_text = message.text.replace(",", ".")
+
+    try:
+        area = float(area_text)
+        if area <= 0:
+            raise ValueError
+    except ValueError:
+        await message.answer("❗ Пожалуйста, введите площадь числом (например: 120)")
+        return
+
+    await state.update_data(area=area)
+
+    await message.answer(
+        f"Площадь: <b>{area} м²</b>\n\n"
+        "Выберите район:",
+        reply_markup=district_kb(),
+        parse_mode="HTML"
+    )
+
+    await AdForm.district.set()
+
+
+
+@dp.callback_query_handler(
+    lambda c: c.data.startswith("district_"),
+    state=AdForm.district
+)
+async def process_district(callback: types.CallbackQuery, state: FSMContext):
+    mapping = {
+        "district_adler": "Адлерский",
+        "district_khosta": "Хостинский",
+        "district_lazarev": "Лазаревский",
+        "district_center": "Центральный",
+        "district_sirius": "Сириус",
+        "district_polana": "Красная Поляна",
+    }
+
+    district = mapping.get(callback.data)
+
+    await state.update_data(district=district)
+    await callback.answer()
+
+    await callback.message.answer(
+        f"Район: <b>{district}</b>\n\n"
+        "Укажите адрес объекта:",
+        parse_mode="HTML"
+    )
+
+    await AdForm.address.set()
+
 
 
 # =========================
