@@ -21,6 +21,13 @@ keyboard.add("Связаться с администратором")
 keyboard.add("ПРОДАЖА смотреть объявления")
 keyboard.add("АРЕНДА смотреть объявления")
 
+photos_done_kb = ReplyKeyboardMarkup(
+    resize_keyboard=True,
+    one_time_keyboard=False
+)
+photos_done_kb.add("Готово")
+
+
 
 # =========================
 # FSM — ОПРОСНИК
@@ -304,7 +311,26 @@ async def process_photos(message: types.Message, state: FSMContext):
 
     await state.update_data(photos=photos)
 
-    await message.answer(f"📸 Фото добавлено ({len(photos)}/10)")
+    await message.answer(f" Фото добавлено ({len(photos)}/10)")
+
+
+
+@dp.message_handler(lambda m: m.text == "Готово", state=AdForm.photos)
+async def photos_done(message: types.Message, state: FSMContext):
+    data = await state.get_data()
+
+    if not data.get("photos"):
+        await message.answer("❗ Добавьте хотя бы одно фото.")
+        return
+
+    await message.answer(
+        "Укажите цену объекта:\n"
+        "Продажа — ₽\n"
+        "Аренда — ₽ / месяц",
+        reply_markup=types.ReplyKeyboardRemove()
+    )
+
+    await AdForm.contact.set()
 
 
 
@@ -317,7 +343,7 @@ async def photos_done(callback: types.CallbackQuery, state: FSMContext):
         return
 
     await callback.message.answer(
-        "💰 Укажите цену объекта:\n\n"
+        " Укажите цену объекта:\n\n"
         "• Продажа — ₽\n"
         "• Аренда — ₽ / месяц"
     )
