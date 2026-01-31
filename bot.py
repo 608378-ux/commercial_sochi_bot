@@ -7,7 +7,7 @@ from aiogram.types import ReplyKeyboardMarkup, InlineKeyboardMarkup, InlineKeybo
 
 API_TOKEN = os.getenv("BOT_TOKEN")
 
-MODERATION_CHAT_ID = -1005135426236
+MODERATION_CHAT_ID = -5135426236
 
 bot = Bot(token=API_TOKEN)
 storage = MemoryStorage()
@@ -94,6 +94,23 @@ def district_kb():
     return kb
 
 
+
+def edit_menu_kb():
+    kb = InlineKeyboardMarkup(row_width=2)
+    kb.add(
+        InlineKeyboardButton("Тип сделки", callback_data="edit_type"),
+        InlineKeyboardButton("Назначение", callback_data="edit_purpose"),
+        InlineKeyboardButton("Площадь", callback_data="edit_area"),
+        InlineKeyboardButton("Район", callback_data="edit_district"),
+        InlineKeyboardButton("Адрес", callback_data="edit_address"),
+        InlineKeyboardButton("Описание", callback_data="edit_description"),
+        InlineKeyboardButton("Цена", callback_data="edit_price"),
+        InlineKeyboardButton("📸 Фото", callback_data="edit_photos"),
+    )
+    kb.add(
+        InlineKeyboardButton("⬅️ Назад", callback_data="edit_back")
+    )
+    return kb
 
 
 # =========================
@@ -395,6 +412,18 @@ async def finalize_ad(message: types.Message, state: FSMContext, contact: str):
 
 
 
+@dp.callback_query_handler(lambda c: c.data == "edit_ad", state="*")
+async def edit_ad(callback: types.CallbackQuery, state: FSMContext):
+    await callback.answer()
+    await callback.message.answer(
+        "✏️ Что вы хотите исправить?",
+        reply_markup=edit_menu_kb()
+    )
+
+
+
+
+
 @dp.callback_query_handler(lambda c: c.data == "send_moderation", state="*")
 async def send_to_moderation(callback: types.CallbackQuery, state: FSMContext):
     data = await state.get_data()
@@ -465,6 +494,98 @@ async def reject_ad(callback: types.CallbackQuery):
 
 
 
+@dp.callback_query_handler(lambda c: c.data == "edit_ad", state="*")
+async def edit_ad(callback: types.CallbackQuery, state: FSMContext):
+    await callback.answer()
+    await callback.message.answer(
+        "✏️ Что вы хотите исправить?\n\n"
+        "Пока можно начать заново.",
+        reply_markup=keyboard
+    )
+    await state.finish()
+
+
+
+@dp.callback_query_handler(lambda c: c.data.startswith("edit_"))
+async def choose_edit_field(callback: types.CallbackQuery, state: FSMContext):
+    field = callback.data.replace("edit_", "")
+
+    if field == "back":
+        await callback.answer()
+        await show_preview(callback.message, state)
+        return
+
+    await state.update_data(edit_field=field)
+    await callback.answer()
+
+    prompts = {
+        "type": "Введите новый тип сделки (Продажа / Аренда):",
+        "purpose": "Введите новое назначение:",
+        "area": "Введите новую площадь:",
+        "district": "Введите новый район:",
+        "address": "Введите новый адрес:",
+        "description": "Введите новое описание:",
+        "price": "Введите новую цену:",
+        "photos": "Отправьте новые фото (старые будут удалены).",
+    }
+
+    await callback.message.answer(prompts.get(field, "Введите новое значение:"))
+
+
+
+@dp.message_handler(state="*")
+async def process_edit_value(message: types.Message, state: FSMContext):
+    data = await state.get_data()
+
+    if "edit_field" not in data:
+        return
+
+    field = data["edit_field"]
+
+    # фото отдельно
+    if field == "photos":
+        await state.update_data(photos=[])
+        await message.answer("📸 Отправьте фото заново (до 10 шт), затем напишите «Готово»")
+        await state.update_data(edit_field=None)
+        await AdForm.photos.set()
+        return
+
+    value = message.text.strip()
+
+    await state.update_data(**{field: value})
+    await state.update_data(edit_field=None)
+
+    await message.answer("✅ Изменения сохранены")
+    await show_preview(message, state)
+
+
+
+
+async def show_preview(message: types.Message, state: FSMContext):
+    data = await state.get_data()
+
+    text = (
+        "📋 <b>Проверьте данные объявления:</b>\n\n"
+        f"🔹 Тип сделки: {data.get('type')}\n"
+        f"🔹 Назначение: {data.get('purpose')}\n"
+        f"🔹 Площадь: {data.get('area')} м²\n"
+        f"🔹 Район: {data.get('district')}\n"
+        f"🔹 Адрес: {data.get('address')}\n"
+        f"🔹 Цена: {data.get('price')}\n\n"
+        f"📝 Описание:\n{data.get('description')}\n\n"
+        f"📞 Контакт: {data.get('contact')}"
+    )
+
+    confirm_kb = InlineKeyboardMarkup()
+    confirm_kb.add(
+        InlineKeyboardButton("✅ Отправить на модерацию", callback_data="send_moderation"),
+        InlineKeyboardButton("✏️ Исправить", callback_data="edit_ad")
+    )
+
+    await message.answer(text, reply_markup=confirm_kb, parse_mode="HTML")
+
+
+
 
 # =========================
 # СВЯЗЬ С АДМИНИСТРАТОРОМ
@@ -510,6 +631,11 @@ async def rent(message: types.Message):
     await message.answer("Аренда коммерческой недвижимости:", reply_markup=kb)
 
 
+
+
+
+
+
 # =========================
 # ЗАПУСК
 # =========================
@@ -518,3 +644,4 @@ async def rent(message: types.Message):
 
 if __name__ == "__main__":
     executor.start_polling(dp, skip_updates=True)
+
