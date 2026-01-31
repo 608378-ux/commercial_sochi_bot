@@ -307,33 +307,12 @@ async def photos_done(message: types.Message, state: FSMContext):
         return
 
     await message.answer(
-        "Укажите цену объекта:\n"
-        "Продажа — ₽\n"
-        "Аренда — ₽ / месяц",
-        reply_markup=types.ReplyKeyboardRemove()
-    )
-
-    await AdForm.contact.set()
-
-
-
-
-@dp.message_handler(lambda m: m.text == "Готово", state=AdForm.photos)
-async def photos_done(message: types.Message, state: FSMContext):
-    data = await state.get_data()
-
-    if not data.get("photos"):
-        await message.answer("❗ Добавьте хотя бы одно фото.")
-        return
-
-    await message.answer(
-        "Укажите цену объекта:\n"
-        "Продажа — ₽\n"
-        "Аренда — ₽ / месяц",
+        "Введите цену объекта :\n\n",
         reply_markup=types.ReplyKeyboardRemove()
     )
 
     await AdForm.price.set()
+
 
 
 
