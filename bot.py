@@ -453,12 +453,12 @@ async def send_to_moderation(callback: types.CallbackQuery, state: FSMContext):
 
 
 
-@dp.callback_query_handler(lambda c: c.data == "approve_ad")
+@dp.callback_query_handler(lambda c: c.data == "approve_ad", state="*")
 async def approve_ad(callback: types.CallbackQuery):
     await callback.answer("Объявление одобрено")
     await callback.message.reply("✅ Объявление одобрено")
 
-@dp.callback_query_handler(lambda c: c.data == "reject_ad")
+@dp.callback_query_handler(lambda c: c.data == "reject_ad", state="*")
 async def reject_ad(callback: types.CallbackQuery):
     await callback.answer("Объявление отклонено")
     await callback.message.reply("❌ Объявление отклонено")
