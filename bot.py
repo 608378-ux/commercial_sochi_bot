@@ -7,7 +7,7 @@ from aiogram.types import ReplyKeyboardMarkup, InlineKeyboardMarkup, InlineKeybo
 
 API_TOKEN = os.getenv("BOT_TOKEN")
 
-MODERATION_CHAT_ID = -1005135426236
+MODERATION_CHAT_ID = -1003846593729
 
 bot = Bot(token=API_TOKEN)
 storage = MemoryStorage()
@@ -426,6 +426,7 @@ async def edit_ad(callback: types.CallbackQuery, state: FSMContext):
 
 @dp.callback_query_handler(lambda c: c.data == "send_moderation", state="*")
 async def send_to_moderation(callback: types.CallbackQuery, state: FSMContext):
+    await callback.answer()
     data = await state.get_data()
 
     text = (
@@ -520,46 +521,22 @@ async def choose_edit_field(callback: types.CallbackQuery, state: FSMContext):
     await callback.message.answer(prompts.get(field, "Введите новое значение:"))
 
 
-@dp.message_handler(
-    content_types=types.ContentType.TEXT,
-    state="*"
-)
+@dp.message_handler(content_types=types.ContentType.TEXT, state="*")
 async def process_edit_value(message: types.Message, state: FSMContext):
     data = await state.get_data()
 
-    # ❗ если пользователь НЕ редактирует — не мешаем другим сценариям
     field = data.get("edit_field")
     if not field:
         return
 
-    # 📸 фото редактируются отдельным сценарием
+    # фото редактируются отдельно
     if field == "photos":
         return
 
     value = message.text.strip()
-
     if not value:
         await message.answer("❗ Значение не может быть пустым")
         return
-
-    await state.update_data(**{field: value})
-    await state.update_data(edit_field=None)
-
-    await message.answer("✅ Изменения сохранены")
-
-    await show_preview(message, state)
-
-
-
-    # фото отдельно
-    if field == "photos":
-        await state.update_data(photos=[])
-        await message.answer("📸 Отправьте фото заново (до 10 шт), затем напишите «Готово»")
-        await state.update_data(edit_field=None)
-        await AdForm.photos.set()
-        return
-
-    value = message.text.strip()
 
     await state.update_data(**{field: value})
     await state.update_data(edit_field=None)
