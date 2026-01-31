@@ -11,7 +11,7 @@ bot = Bot(token=API_TOKEN)
 storage = MemoryStorage()
 dp = Dispatcher(bot, storage=storage)
 
-
+MODERATION_CHAT_ID = -1005135426236
 
 photos_done_kb = ReplyKeyboardMarkup(
     resize_keyboard=True
@@ -437,6 +437,75 @@ async def rent(message: types.Message):
     )
     await message.answer("Аренда коммерческой недвижимости:", reply_markup=kb)
 
+
+
+@dp.callback_query_handler(lambda c: c.data == "send_moderation")
+async def send_to_moderation(callback: types.CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+
+    text = (
+        "🆕 <b>НОВОЕ ОБЪЯВЛЕНИЕ НА МОДЕРАЦИЮ</b>\n\n"
+        f"🔹 Тип сделки: {data['type']}\n"
+        f"🔹 Назначение: {data['purpose']}\n"
+        f"🔹 Площадь: {data['area']} м²\n"
+        f"🔹 Район: {data['district']}\n"
+        f"🔹 Адрес: {data['address']}\n"
+        f"🔹 Цена: {data['price']}\n\n"
+        f"📝 Описание:\n{data['description']}\n\n"
+        f"📞 Контакт: {data['contact']}"
+    )
+
+    moderation_kb = InlineKeyboardMarkup()
+    moderation_kb.add(
+        InlineKeyboardButton("✅ Одобрить", callback_data="approve_ad"),
+        InlineKeyboardButton("❌ Отклонить", callback_data="reject_ad")
+    )
+
+    photos = data.get("photos", [])
+
+    # отправляем первое фото с текстом
+    if photos:
+        await bot.send_photo(
+            chat_id=MODERATION_CHAT_ID,
+            photo=photos[0],
+            caption=text,
+            reply_markup=moderation_kb,
+            parse_mode="HTML"
+        )
+
+        # остальные фото — без текста
+        for photo_id in photos[1:]:
+            await bot.send_photo(
+                chat_id=MODERATION_CHAT_ID,
+                photo=photo_id
+            )
+    else:
+        await bot.send_message(
+            chat_id=MODERATION_CHAT_ID,
+            text=text,
+            reply_markup=moderation_kb,
+            parse_mode="HTML"
+        )
+
+    await callback.answer("Объявление отправлено на модерацию ✅")
+    await callback.message.answer(
+        "Спасибо! Ваше объявление отправлено на модерацию.\n"
+        "Мы свяжемся с вами после проверки."
+    )
+
+    await state.finish()
+
+
+
+@dp.callback_query_handler(lambda c: c.data == "approve_ad")
+async def approve_ad(callback: types.CallbackQuery):
+    await callback.answer("Объявление одобрено")
+    await callback.message.reply("✅ Объявление одобрено")
+
+@dp.callback_query_handler(lambda c: c.data == "reject_ad")
+async def reject_ad(callback: types.CallbackQuery):
+    await callback.answer("Объявление отклонено")
+    await callback.message.reply("❌ Объявление отклонено")
 
 
 
