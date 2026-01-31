@@ -337,6 +337,83 @@ async def photos_done(message: types.Message, state: FSMContext):
 
 
 
+@dp.message_handler(state=AdForm.price)
+async def process_price(message: types.Message, state: FSMContext):
+    price = message.text.strip()
+
+    if len(price) < 2:
+        await message.answer("❗ Пожалуйста, укажите корректную цену.")
+        return
+
+    await state.update_data(price=price)
+
+    # клавиатура контакта
+    contact_kb = ReplyKeyboardMarkup(
+        resize_keyboard=True,
+        one_time_keyboard=True
+    )
+    contact_kb.add(
+        types.KeyboardButton("📞 Поделиться номером", request_contact=True)
+    )
+    contact_kb.add("✍️ Ввести вручную")
+
+    await message.answer(
+        "Укажите контакт для связи:",
+        reply_markup=contact_kb
+    )
+
+    await AdForm.contact.set()
+
+
+
+@dp.message_handler(content_types=types.ContentType.CONTACT, state=AdForm.contact)
+async def process_contact_share(message: types.Message, state: FSMContext):
+    contact = message.contact.phone_number
+    await finalize_ad(message, state, contact)
+
+
+@dp.message_handler(state=AdForm.contact)
+async def process_contact_manual(message: types.Message, state: FSMContext):
+    contact = message.text.strip()
+
+    if len(contact) < 5:
+        await message.answer("❗ Укажите корректный контакт.")
+        return
+
+    await finalize_ad(message, state, contact)
+
+
+
+async def finalize_ad(message: types.Message, state: FSMContext, contact: str):
+    data = await state.get_data()
+
+    text = (
+        "📋 <b>Проверьте данные объявления:</b>\n\n"
+        f"🔹 Тип сделки: {data['type']}\n"
+        f"🔹 Назначение: {data['purpose']}\n"
+        f"🔹 Площадь: {data['area']} м²\n"
+        f"🔹 Район: {data['district']}\n"
+        f"🔹 Адрес: {data['address']}\n"
+        f"🔹 Цена: {data['price']}\n\n"
+        f"📝 Описание:\n{data['description']}\n\n"
+        f"📞 Контакт: {contact}"
+    )
+
+    confirm_kb = InlineKeyboardMarkup()
+    confirm_kb.add(
+        InlineKeyboardButton("✅ Отправить на модерацию", callback_data="send_moderation"),
+        InlineKeyboardButton("✏️ Исправить", callback_data="edit_ad")
+    )
+
+    await state.update_data(contact=contact)
+
+    await message.answer(
+        text,
+        reply_markup=confirm_kb,
+        parse_mode="HTML"
+    )
+
+
 
 # =========================
 # СВЯЗЬ С АДМИНИСТРАТОРОМ
