@@ -7,11 +7,12 @@ from aiogram.types import ReplyKeyboardMarkup, InlineKeyboardMarkup, InlineKeybo
 
 API_TOKEN = os.getenv("BOT_TOKEN")
 
+MODERATION_CHAT_ID = -1005135426236
+
 bot = Bot(token=API_TOKEN)
 storage = MemoryStorage()
 dp = Dispatcher(bot, storage=storage)
 
-MODERATION_CHAT_ID = -1005135426236
 
 photos_done_kb = ReplyKeyboardMarkup(
     resize_keyboard=True
@@ -394,51 +395,6 @@ async def finalize_ad(message: types.Message, state: FSMContext, contact: str):
 
 
 
-# =========================
-# СВЯЗЬ С АДМИНИСТРАТОРОМ
-# =========================
-
-@dp.message_handler(lambda m: m.text == "Связаться с администратором")
-async def contact_admin(message: types.Message):
-    await message.answer(
-        "📞 Контакты администратора:\n\n"
-        "Телефон: +7 938 400-05-58\n"
-        "Telegram: https://t.me/Svetla_Sochi\n"
-       
-    )
-
-
-# =========================
-# ПРОДАЖА
-# =========================
-
-@dp.message_handler(lambda m: m.text == "ПРОДАЖА смотреть объявления")
-async def sale(message: types.Message):
-    kb = InlineKeyboardMarkup().add(
-        InlineKeyboardButton(
-            text="Открыть объявления о продаже",
-            url="https://t.me/sochi_commerc/4"
-        )
-    )
-    await message.answer("Продажа коммерческой недвижимости:", reply_markup=kb)
-
-
-# =========================
-# АРЕНДА
-# =========================
-
-@dp.message_handler(lambda m: m.text == "АРЕНДА смотреть объявления")
-async def rent(message: types.Message):
-    kb = InlineKeyboardMarkup().add(
-        InlineKeyboardButton(
-            text="Открыть объявления об аренде",
-            url="https://t.me/sochi_commerc/3"
-        )
-    )
-    await message.answer("Аренда коммерческой недвижимости:", reply_markup=kb)
-
-
-
 @dp.callback_query_handler(lambda c: c.data == "send_moderation")
 async def send_to_moderation(callback: types.CallbackQuery, state: FSMContext):
     data = await state.get_data()
@@ -507,6 +463,111 @@ async def reject_ad(callback: types.CallbackQuery):
     await callback.answer("Объявление отклонено")
     await callback.message.reply("❌ Объявление отклонено")
 
+
+
+@dp.callback_query_handler(lambda c: c.data == "send_moderation")
+async def send_to_moderation(callback: types.CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+
+    photos = data.get("photos", [])
+
+    text = (
+        "🆕 <b>Новое объявление на модерацию</b>\n\n"
+        f"🔹 Тип сделки: {data['type']}\n"
+        f"🔹 Назначение: {data['purpose']}\n"
+        f"🔹 Площадь: {data['area']} м²\n"
+        f"🔹 Район: {data['district']}\n"
+        f"🔹 Адрес: {data['address']}\n"
+        f"🔹 Цена: {data['price']}\n\n"
+        f"📝 Описание:\n{data['description']}\n\n"
+        f"📞 Контакт: {data['contact']}"
+    )
+
+    # кнопки модерации
+    mod_kb = InlineKeyboardMarkup()
+    mod_kb.add(
+        InlineKeyboardButton("✅ Одобрить", callback_data="approve_ad"),
+        InlineKeyboardButton("❌ Отклонить", callback_data="reject_ad")
+    )
+
+    # если есть фото — отправляем альбом
+    if photos:
+        media = [
+            types.InputMediaPhoto(media=photo_id)
+            for photo_id in photos
+        ]
+        media[0].caption = text
+        media[0].parse_mode = "HTML"
+
+        await bot.send_media_group(
+            chat_id=MODERATION_CHAT_ID,
+            media=media
+        )
+
+        await bot.send_message(
+            chat_id=MODERATION_CHAT_ID,
+            reply_markup=mod_kb
+        )
+    else:
+        await bot.send_message(
+            chat_id=MODERATION_CHAT_ID,
+            text=text,
+            reply_markup=mod_kb,
+            parse_mode="HTML"
+        )
+
+    await callback.answer("✅ Отправлено на модерацию")
+    await callback.message.answer(
+        "Спасибо! Объявление отправлено на модерацию.\n"
+        "Мы свяжемся с вами после проверки."
+    )
+
+    await state.finish()
+
+
+
+# =========================
+# СВЯЗЬ С АДМИНИСТРАТОРОМ
+# =========================
+
+@dp.message_handler(lambda m: m.text == "Связаться с администратором")
+async def contact_admin(message: types.Message):
+    await message.answer(
+        "📞 Контакты администратора:\n\n"
+        "Телефон: +7 938 400-05-58\n"
+        "Telegram: https://t.me/Svetla_Sochi\n"
+       
+    )
+
+
+# =========================
+# ПРОДАЖА
+# =========================
+
+@dp.message_handler(lambda m: m.text == "ПРОДАЖА смотреть объявления")
+async def sale(message: types.Message):
+    kb = InlineKeyboardMarkup().add(
+        InlineKeyboardButton(
+            text="Открыть объявления о продаже",
+            url="https://t.me/sochi_commerc/4"
+        )
+    )
+    await message.answer("Продажа коммерческой недвижимости:", reply_markup=kb)
+
+
+# =========================
+# АРЕНДА
+# =========================
+
+@dp.message_handler(lambda m: m.text == "АРЕНДА смотреть объявления")
+async def rent(message: types.Message):
+    kb = InlineKeyboardMarkup().add(
+        InlineKeyboardButton(
+            text="Открыть объявления об аренде",
+            url="https://t.me/sochi_commerc/3"
+        )
+    )
+    await message.answer("Аренда коммерческой недвижимости:", reply_markup=kb)
 
 
 # =========================
