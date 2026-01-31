@@ -7,7 +7,7 @@ from aiogram.types import ReplyKeyboardMarkup, InlineKeyboardMarkup, InlineKeybo
 
 API_TOKEN = os.getenv("BOT_TOKEN")
 
-MODERATION_CHAT_ID = -5135426236
+MODERATION_CHAT_ID = -1005135426236
 
 bot = Bot(token=API_TOKEN)
 storage = MemoryStorage()
@@ -494,18 +494,6 @@ async def reject_ad(callback: types.CallbackQuery):
 
 
 
-@dp.callback_query_handler(lambda c: c.data == "edit_ad", state="*")
-async def edit_ad(callback: types.CallbackQuery, state: FSMContext):
-    await callback.answer()
-    await callback.message.answer(
-        "✏️ Что вы хотите исправить?\n\n"
-        "Пока можно начать заново.",
-        reply_markup=keyboard
-    )
-    await state.finish()
-
-
-
 @dp.callback_query_handler(lambda c: c.data.startswith("edit_"))
 async def choose_edit_field(callback: types.CallbackQuery, state: FSMContext):
     field = callback.data.replace("edit_", "")
@@ -532,15 +520,36 @@ async def choose_edit_field(callback: types.CallbackQuery, state: FSMContext):
     await callback.message.answer(prompts.get(field, "Введите новое значение:"))
 
 
-
-@dp.message_handler(state="*")
+@dp.message_handler(
+    content_types=types.ContentType.TEXT,
+    state="*"
+)
 async def process_edit_value(message: types.Message, state: FSMContext):
     data = await state.get_data()
 
-    if "edit_field" not in data:
+    # ❗ если пользователь НЕ редактирует — не мешаем другим сценариям
+    field = data.get("edit_field")
+    if not field:
         return
 
-    field = data["edit_field"]
+    # 📸 фото редактируются отдельным сценарием
+    if field == "photos":
+        return
+
+    value = message.text.strip()
+
+    if not value:
+        await message.answer("❗ Значение не может быть пустым")
+        return
+
+    await state.update_data(**{field: value})
+    await state.update_data(edit_field=None)
+
+    await message.answer("✅ Изменения сохранены")
+
+    await show_preview(message, state)
+
+
 
     # фото отдельно
     if field == "photos":
@@ -633,9 +642,6 @@ async def rent(message: types.Message):
 
 
 
-
-
-
 # =========================
 # ЗАПУСК
 # =========================
@@ -644,4 +650,3 @@ async def rent(message: types.Message):
 
 if __name__ == "__main__":
     executor.start_polling(dp, skip_updates=True)
-
