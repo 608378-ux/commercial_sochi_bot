@@ -405,7 +405,7 @@ async def process_price(message: types.Message, state: FSMContext):
         reply_markup=contact_kb
     )
 
-     await AdForm.contact_method.set()
+    await AdForm.contact_method.set()
 
 
 
@@ -418,15 +418,24 @@ async def process_contact_share(message: types.Message, state: FSMContext):
     await AdForm.preview.set()
 
 
+
+@dp.message_handler(lambda m: m.text == "Ввести вручную", state=AdForm.contact_method)
+async def contact_manual_start(message: types.Message, state: FSMContext):
+    await message.answer(
+        "Введите контакт для связи в свободной форме:",
+        reply_markup=types.ReplyKeyboardRemove()
+    )
+    await AdForm.contact.set()
+
+
 @dp.message_handler(state=AdForm.contact)
 async def process_contact_manual(message: types.Message, state: FSMContext):
     contact = message.text.strip()
 
-    if len(contact) < 5:
-        await message.answer("❗ Укажите корректный контакт.")
-        return
+    await state.update_data(contact=contact)
+    await show_preview(message, state)
+    await AdForm.preview.set()
 
-    await finalize_ad(message, state, contact)
 
 
 
