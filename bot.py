@@ -45,7 +45,10 @@ class AdForm(StatesGroup):
     description = State()
     photos = State()
     price = State()
+    contact_method = State()
     contact = State()
+    preview = State()
+    edit = State()
 
 
 # =========================
@@ -134,6 +137,52 @@ async def start(message: types.Message):
         "Добро пожаловать!\nВыберите действие:",
         reply_markup=keyboard
     )
+
+
+
+# =========================
+# СВЯЗЬ С АДМИНИСТРАТОРОМ
+# =========================
+
+@dp.message_handler(lambda m: m.text == "Связаться с администратором")
+async def contact_admin(message: types.Message):
+    await message.answer(
+        "📞 Контакты администратора:\n\n"
+        "Телефон: +7 938 400-05-58\n"
+        "Telegram: https://t.me/Svetla_Sochi\n"
+       
+    )
+
+
+# =========================
+# ПРОДАЖА
+# =========================
+
+@dp.message_handler(lambda m: m.text == "ПРОДАЖА смотреть объявления")
+async def sale(message: types.Message):
+    kb = InlineKeyboardMarkup().add(
+        InlineKeyboardButton(
+            text="Открыть объявления о продаже",
+            url="https://t.me/sochi_commerc/4"
+        )
+    )
+    await message.answer("Продажа коммерческой недвижимости:", reply_markup=kb)
+
+
+# =========================
+# АРЕНДА
+# =========================
+
+@dp.message_handler(lambda m: m.text == "АРЕНДА смотреть объявления")
+async def rent(message: types.Message):
+    kb = InlineKeyboardMarkup().add(
+        InlineKeyboardButton(
+            text="Открыть объявления об аренде",
+            url="https://t.me/sochi_commerc/3"
+        )
+    )
+    await message.answer("Аренда коммерческой недвижимости:", reply_markup=kb)
+
 
 
 # =========================
@@ -338,9 +387,6 @@ async def photos_done(message: types.Message, state: FSMContext):
 async def process_price(message: types.Message, state: FSMContext):
     price = message.text.strip()
 
-    if len(price) < 2:
-        await message.answer("❗ Пожалуйста, укажите корректную цену.")
-        return
 
     await state.update_data(price=price)
 
@@ -350,23 +396,26 @@ async def process_price(message: types.Message, state: FSMContext):
         one_time_keyboard=True
     )
     contact_kb.add(
-        types.KeyboardButton("📞 Поделиться номером", request_contact=True)
+        types.KeyboardButton("Поделиться номером", request_contact=True)
     )
-    contact_kb.add("✍️ Ввести вручную")
+    contact_kb.add("Ввести вручную")
 
     await message.answer(
         "Укажите контакт для связи:",
         reply_markup=contact_kb
     )
 
-    await AdForm.contact.set()
+     await AdForm.contact_method.set()
 
 
 
-@dp.message_handler(content_types=types.ContentType.CONTACT, state=AdForm.contact)
+@dp.message_handler(content_types=types.ContentType.CONTACT, state=AdForm.contact_method)
 async def process_contact_share(message: types.Message, state: FSMContext):
     contact = message.contact.phone_number
-    await finalize_ad(message, state, contact)
+    await state.update_data(contact=contact)
+
+    await show_preview(message, state)
+    await AdForm.preview.set()
 
 
 @dp.message_handler(state=AdForm.contact)
@@ -398,8 +447,8 @@ async def finalize_ad(message: types.Message, state: FSMContext, contact: str):
 
     confirm_kb = InlineKeyboardMarkup()
     confirm_kb.add(
-        InlineKeyboardButton("✅ Отправить на модерацию", callback_data="send_moderation"),
-        InlineKeyboardButton("✏️ Исправить", callback_data="edit_ad")
+        InlineKeyboardButton("Отправить на модерацию", callback_data="send_moderation"),
+        InlineKeyboardButton("Исправить", callback_data="edit_ad")
     )
 
     await state.update_data(contact=contact)
@@ -411,20 +460,24 @@ async def finalize_ad(message: types.Message, state: FSMContext, contact: str):
     )
 
 
+    await AdForm.preview.set()
 
-@dp.callback_query_handler(lambda c: c.data == "edit_ad", state="*")
+
+
+
+@dp.callback_query_handler(lambda c: c.data == "edit_ad", state=AdForm.preview)
 async def edit_ad(callback: types.CallbackQuery, state: FSMContext):
     await callback.answer()
     await callback.message.answer(
-        "✏️ Что вы хотите исправить?",
+        "Что Вы хотите исправить?",
         reply_markup=edit_menu_kb()
     )
+    await AdForm.edit.set()
 
 
 
 
-
-@dp.callback_query_handler(lambda c: c.data == "send_moderation", state="*")
+@dp.callback_query_handler(lambda c: c.data == "send_moderation", state=AdForm.preview)
 async def send_to_moderation(callback: types.CallbackQuery, state: FSMContext):
     await callback.answer()
     data = await state.get_data()
@@ -495,30 +548,33 @@ async def reject_ad(callback: types.CallbackQuery):
 
 
 
-@dp.callback_query_handler(lambda c: c.data.startswith("edit_"))
+@dp.callback_query_handler(lambda c: c.data.startswith("edit_"), state=AdForm.edit)
 async def choose_edit_field(callback: types.CallbackQuery, state: FSMContext):
     field = callback.data.replace("edit_", "")
 
     if field == "back":
         await callback.answer()
         await show_preview(callback.message, state)
+        await AdForm.preview.set()
         return
 
     await state.update_data(edit_field=field)
     await callback.answer()
 
     prompts = {
-        "type": "Введите новый тип сделки (Продажа / Аренда):",
+        "type": "Введите новый тип сделки:",
         "purpose": "Введите новое назначение:",
         "area": "Введите новую площадь:",
         "district": "Введите новый район:",
         "address": "Введите новый адрес:",
         "description": "Введите новое описание:",
         "price": "Введите новую цену:",
-        "photos": "Отправьте новые фото (старые будут удалены).",
+        "photos": "Отправьте новые фото (старые будут удалены)",
     }
 
-    await callback.message.answer(prompts.get(field, "Введите новое значение:"))
+    await callback.message.answer(prompts[field])
+
+
 
 
 @dp.message_handler(content_types=types.ContentType.TEXT, state="*")
@@ -564,57 +620,12 @@ async def show_preview(message: types.Message, state: FSMContext):
 
     confirm_kb = InlineKeyboardMarkup()
     confirm_kb.add(
-        InlineKeyboardButton("✅ Отправить на модерацию", callback_data="send_moderation"),
-        InlineKeyboardButton("✏️ Исправить", callback_data="edit_ad")
+        InlineKeyboardButton("Отправить на модерацию", callback_data="send_moderation"),
+        InlineKeyboardButton("Исправить", callback_data="edit_ad")
     )
 
     await message.answer(text, reply_markup=confirm_kb, parse_mode="HTML")
 
-
-
-
-# =========================
-# СВЯЗЬ С АДМИНИСТРАТОРОМ
-# =========================
-
-@dp.message_handler(lambda m: m.text == "Связаться с администратором")
-async def contact_admin(message: types.Message):
-    await message.answer(
-        "📞 Контакты администратора:\n\n"
-        "Телефон: +7 938 400-05-58\n"
-        "Telegram: https://t.me/Svetla_Sochi\n"
-       
-    )
-
-
-# =========================
-# ПРОДАЖА
-# =========================
-
-@dp.message_handler(lambda m: m.text == "ПРОДАЖА смотреть объявления")
-async def sale(message: types.Message):
-    kb = InlineKeyboardMarkup().add(
-        InlineKeyboardButton(
-            text="Открыть объявления о продаже",
-            url="https://t.me/sochi_commerc/4"
-        )
-    )
-    await message.answer("Продажа коммерческой недвижимости:", reply_markup=kb)
-
-
-# =========================
-# АРЕНДА
-# =========================
-
-@dp.message_handler(lambda m: m.text == "АРЕНДА смотреть объявления")
-async def rent(message: types.Message):
-    kb = InlineKeyboardMarkup().add(
-        InlineKeyboardButton(
-            text="Открыть объявления об аренде",
-            url="https://t.me/sochi_commerc/3"
-        )
-    )
-    await message.answer("Аренда коммерческой недвижимости:", reply_markup=kb)
 
 
 
