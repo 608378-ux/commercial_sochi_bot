@@ -144,7 +144,7 @@ async def start(message: types.Message):
 # СВЯЗЬ С АДМИНИСТРАТОРОМ
 # =========================
 
-@dp.message_handler(lambda m: m.text == "Связаться с администратором")
+@dp.message_handler(lambda m: m.text == "Связаться с администратором", state="*")
 async def contact_admin(message: types.Message):
     await message.answer(
         "📞 Контакты администратора:\n\n"
@@ -158,7 +158,7 @@ async def contact_admin(message: types.Message):
 # ПРОДАЖА
 # =========================
 
-@dp.message_handler(lambda m: m.text == "ПРОДАЖА смотреть объявления")
+@dp.message_handler(lambda m: m.text == "ПРОДАЖА смотреть объявления", state="*")
 async def sale(message: types.Message):
     kb = InlineKeyboardMarkup().add(
         InlineKeyboardButton(
@@ -173,7 +173,7 @@ async def sale(message: types.Message):
 # АРЕНДА
 # =========================
 
-@dp.message_handler(lambda m: m.text == "АРЕНДА смотреть объявления")
+@dp.message_handler(lambda m: m.text == "АРЕНДА смотреть объявления", state="*")
 async def rent(message: types.Message):
     kb = InlineKeyboardMarkup().add(
         InlineKeyboardButton(
@@ -585,17 +585,12 @@ async def choose_edit_field(callback: types.CallbackQuery, state: FSMContext):
 
 
 
-
-@dp.message_handler(content_types=types.ContentType.TEXT, state="*")
+@dp.message_handler(state=AdForm.edit)
 async def process_edit_value(message: types.Message, state: FSMContext):
     data = await state.get_data()
-
     field = data.get("edit_field")
-    if not field:
-        return
 
-    # фото редактируются отдельно
-    if field == "photos":
+    if not field:
         return
 
     value = message.text.strip()
@@ -608,6 +603,7 @@ async def process_edit_value(message: types.Message, state: FSMContext):
 
     await message.answer("✅ Изменения сохранены")
     await show_preview(message, state)
+    await AdForm.preview.set()
 
 
 
