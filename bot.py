@@ -120,24 +120,27 @@ def edit_menu_kb():
 # /start
 # =========================
 
-@dp.message_handler(commands=["start"])
-async def start(message: types.Message):
-    # deeplink из группы: ?start=post
-    if message.get_args() == "post":
-        await message.answer(
-            "✍️ Размещение объявления\n\n"
-            "Пожалуйста, ответьте на несколько вопросов.",
-            reply_markup=keyboard
-        )
-        await AdForm.deal_type.set()
-        return
+@dp.message_handler(commands=["start"], state="*")
+async def start(message: types.Message, state: FSMContext):
+    await state.finish()
 
-    # обычный запуск бота
     await message.answer(
         "Добро пожаловать!\nВыберите действие:",
         reply_markup=keyboard
     )
 
+
+# =========================
+# /cancel
+# =========================
+
+@dp.message_handler(commands=["cancel"], state="*")
+async def cancel(message: types.Message, state: FSMContext):
+    await state.finish()
+    await message.answer(
+        "Действие отменено.\nВыберите действие:",
+        reply_markup=keyboard
+    )
 
 
 # =========================
@@ -190,13 +193,19 @@ async def rent(message: types.Message):
 # =========================
 
 
-@dp.message_handler(lambda m: m.text == "Разместить объявление")
-async def add_ad_start(message: types.Message):
+async def start_ad_flow(message: types.Message, state: FSMContext):
+    await state.finish()  # ← КЛЮЧЕВО
     await message.answer(
         "Выберите тип сделки:",
         reply_markup=deal_type_kb()
     )
     await AdForm.deal_type.set()
+
+
+@dp.message_handler(lambda m: m.text == "Разместить объявление", state="*")
+async def add_ad_start(message: types.Message, state: FSMContext):
+    await start_ad_flow(message, state)
+
 
 
 @dp.callback_query_handler(
@@ -542,6 +551,11 @@ async def send_to_moderation(callback: types.CallbackQuery, state: FSMContext):
     )
 
     await state.finish()
+    await callback.message.answer(
+        "Вы можете разместить новое объявление или выбрать другое действие:",
+        reply_markup=keyboard
+    )
+
 
 
 
