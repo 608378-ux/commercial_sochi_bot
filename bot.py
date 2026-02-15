@@ -43,7 +43,7 @@ class AdForm(StatesGroup):
     district = State()
     address = State()
     description = State()
-    photos = State()
+    media = State()
     price = State()
     contact_method = State()
     contact = State()
@@ -108,7 +108,7 @@ def edit_menu_kb():
         InlineKeyboardButton("Адрес", callback_data="edit_address"),
         InlineKeyboardButton("Описание", callback_data="edit_description"),
         InlineKeyboardButton("Цена", callback_data="edit_price"),
-        InlineKeyboardButton("📸 Фото", callback_data="edit_photos"),
+        InlineKeyboardButton("Медиа", callback_data="edit_photos"),
     )
     kb.add(
         InlineKeyboardButton("⬅️ Назад", callback_data="edit_back")
@@ -506,7 +506,6 @@ async def edit_ad(callback: types.CallbackQuery, state: FSMContext):
 
 
 
-
 @dp.callback_query_handler(lambda c: c.data == "send_moderation", state=AdForm.preview)
 async def send_to_moderation(callback: types.CallbackQuery, state: FSMContext):
     await callback.answer()
@@ -530,65 +529,61 @@ async def send_to_moderation(callback: types.CallbackQuery, state: FSMContext):
         InlineKeyboardButton("❌ Отклонить", callback_data="reject_ad")
     )
 
+    media = data.get("media", [])
 
-data = await state.get_data()
-media = data.get("media", [])
-
-if not media:
-    await bot.send_message(
-        chat_id=MODERATION_CHAT_ID,
-        text=text,
-        reply_markup=moderation_kb,
-        parse_mode="HTML"
-    )
-    return
-
-# первое медиа — с кнопками
-first = media[0]
-
-if first["type"] == "photo":
-    await bot.send_photo(
-        chat_id=MODERATION_CHAT_ID,
-        photo=first["file_id"],
-        caption=text,
-        reply_markup=moderation_kb,
-        parse_mode="HTML"
-    )
-elif first["type"] == "video":
-    await bot.send_video(
-        chat_id=MODERATION_CHAT_ID,
-        video=first["file_id"],
-        caption=text,
-        reply_markup=moderation_kb,
-        parse_mode="HTML"
-    )
-
-# остальные — с подписью, но БЕЗ кнопок
-for item in media[1:]:
-    if item["type"] == "photo":
-        await bot.send_photo(
+    # если медиа нет
+    if not media:
+        await bot.send_message(
             chat_id=MODERATION_CHAT_ID,
-            photo=item["file_id"],
-            caption=text,
+            text=text,
+            reply_markup=moderation_kb,
             parse_mode="HTML"
         )
-    elif item["type"] == "video":
-        await bot.send_video(
-            chat_id=MODERATION_CHAT_ID,
-            video=item["file_id"],
-            caption=text,
-            parse_mode="HTML"
-        )
+    else:
+        # первое медиа — с кнопками
+        first = media[0]
 
+        if first["type"] == "photo":
+            await bot.send_photo(
+                chat_id=MODERATION_CHAT_ID,
+                photo=first["file_id"],
+                caption=text,
+                reply_markup=moderation_kb,
+                parse_mode="HTML"
+            )
+        elif first["type"] == "video":
+            await bot.send_video(
+                chat_id=MODERATION_CHAT_ID,
+                video=first["file_id"],
+                caption=text,
+                reply_markup=moderation_kb,
+                parse_mode="HTML"
+            )
 
+        # остальные — с подписью, без кнопок
+        for item in media[1:]:
+            if item["type"] == "photo":
+                await bot.send_photo(
+                    chat_id=MODERATION_CHAT_ID,
+                    photo=item["file_id"],
+                    caption=text,
+                    parse_mode="HTML"
+                )
+            elif item["type"] == "video":
+                await bot.send_video(
+                    chat_id=MODERATION_CHAT_ID,
+                    video=item["file_id"],
+                    caption=text,
+                    parse_mode="HTML"
+                )
 
-    await callback.answer("Объявление отправлено на модерацию ✅")
     await callback.message.answer(
         "Спасибо! Ваше объявление отправлено на модерацию.\n"
         "Мы свяжемся с вами после проверки."
     )
 
     await state.finish()
+
     await callback.message.answer(
         "Вы можете разместить новое объявление или выбрать другое действие:",
         reply_markup=keyboard
