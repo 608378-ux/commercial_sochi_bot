@@ -343,10 +343,9 @@ async def process_description(message: types.Message, state: FSMContext):
         return
 
     await state.update_data(description=description)
-    await state.update_data(photos=[])
-
+    await state.update_data(media=[])
     await message.answer(
-        "📸 Добавьте фото объекта (до 10 шт).\n"
+        "📸 Добавьте фото и/или видео объекта (до 10 шт).\n"
         "Когда закончите — нажмите «Готово».",
         reply_markup=photos_done_kb
     )
@@ -354,23 +353,36 @@ async def process_description(message: types.Message, state: FSMContext):
     await AdForm.photos.set()
 
 
-
-
-@dp.message_handler(content_types=types.ContentType.PHOTO, state=AdForm.photos)
-async def process_photos(message: types.Message, state: FSMContext):
+@dp.message_handler(
+    content_types=[types.ContentType.PHOTO, types.ContentType.VIDEO],
+    state=AdForm.photos
+)
+async def process_media(message: types.Message, state: FSMContext):
     data = await state.get_data()
-    photos = data.get("photos", [])
+    media = data.get("media", [])
 
-    if len(photos) >= 10:
-        await message.answer("⛔️ Можно добавить не более 10 фото.")
+    if len(media) >= 10:
+        await message.answer("⛔ Можно добавить не более 10 файлов (фото + видео).")
         return
 
-    photo_id = message.photo[-1].file_id
-    photos.append(photo_id)
+    if message.content_type == types.ContentType.PHOTO:
+        file_id = message.photo[-1].file_id
+        media.append({
+            "type": "photo",
+            "file_id": file_id
+        })
 
-    await state.update_data(photos=photos)
+    elif message.content_type == types.ContentType.VIDEO:
+        file_id = message.video.file_id
+        media.append({
+            "type": "video",
+            "file_id": file_id
+        })
 
-    await message.answer(f" Фото добавлено ({len(photos)}/10)")
+    await state.update_data(media=media)
+
+    await message.answer(f"✅ Добавлено ({len(media)}/10)")
+
 
 
 
@@ -378,7 +390,7 @@ async def process_photos(message: types.Message, state: FSMContext):
 async def photos_done(message: types.Message, state: FSMContext):
     data = await state.get_data()
 
-    if not data.get("photos"):
+    if not data.get("media"):
         await message.answer("❗ Добавьте хотя бы одно фото.")
         return
 
@@ -518,31 +530,57 @@ async def send_to_moderation(callback: types.CallbackQuery, state: FSMContext):
         InlineKeyboardButton("❌ Отклонить", callback_data="reject_ad")
     )
 
-    photos = data.get("photos", [])
 
-    # отправляем первое фото с текстом
-    if photos:
+data = await state.get_data()
+media = data.get("media", [])
+
+if not media:
+    await bot.send_message(
+        chat_id=MODERATION_CHAT_ID,
+        text=text,
+        reply_markup=moderation_kb,
+        parse_mode="HTML"
+    )
+    return
+
+# первое медиа — с кнопками
+first = media[0]
+
+if first["type"] == "photo":
+    await bot.send_photo(
+        chat_id=MODERATION_CHAT_ID,
+        photo=first["file_id"],
+        caption=text,
+        reply_markup=moderation_kb,
+        parse_mode="HTML"
+    )
+elif first["type"] == "video":
+    await bot.send_video(
+        chat_id=MODERATION_CHAT_ID,
+        video=first["file_id"],
+        caption=text,
+        reply_markup=moderation_kb,
+        parse_mode="HTML"
+    )
+
+# остальные — с подписью, но БЕЗ кнопок
+for item in media[1:]:
+    if item["type"] == "photo":
         await bot.send_photo(
             chat_id=MODERATION_CHAT_ID,
-            photo=photos[0],
+            photo=item["file_id"],
             caption=text,
-            reply_markup=moderation_kb,
+            parse_mode="HTML"
+        )
+    elif item["type"] == "video":
+        await bot.send_video(
+            chat_id=MODERATION_CHAT_ID,
+            video=item["file_id"],
+            caption=text,
             parse_mode="HTML"
         )
 
-        # остальные фото — без текста
-        for photo_id in photos[1:]:
-            await bot.send_photo(
-                chat_id=MODERATION_CHAT_ID,
-                photo=photo_id
-            )
-    else:
-        await bot.send_message(
-            chat_id=MODERATION_CHAT_ID,
-            text=text,
-            reply_markup=moderation_kb,
-            parse_mode="HTML"
-        )
+
 
     await callback.answer("Объявление отправлено на модерацию ✅")
     await callback.message.answer(
