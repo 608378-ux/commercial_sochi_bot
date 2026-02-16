@@ -71,27 +71,6 @@ def main_menu_inline_kb():
     return kb
 
 
-# =========================
-# INLINE-КЛАВИАТУРА выбора контакта
-# =========================
-
-def contact_method_inline_kb():
-    kb = InlineKeyboardMarkup(row_width=1)
-    kb.add(
-        InlineKeyboardButton(
-            "Поделиться номером",
-            callback_data="contact_share"
-        ),
-        InlineKeyboardButton(
-            "Ввести вручную",
-            callback_data="contact_manual"
-        ),
-        InlineKeyboardButton(
-            "Отмена",
-            callback_data="cancel_ad"
-        )
-    )
-    return kb
 
 
 
@@ -172,6 +151,18 @@ def cancel_inline_kb():
     return kb
 
 
+# =========================
+# Функции валидации
+# =========================
+
+import re
+
+def is_phone(text: str) -> bool:
+    text = text.replace(" ", "").replace("-", "").replace("(", "").replace(")", "")
+    return bool(re.fullmatch(r"(\+7|7|8)\d{10}", text))
+
+def is_username(text: str) -> bool:
+    return bool(re.fullmatch(r"@[A-Za-z0-9_]{5,32}", text))
 
 
 # =========================
@@ -505,12 +496,23 @@ async def process_price(message: types.Message, state: FSMContext):
     price = message.text.strip()
     await state.update_data(price=price)
 
+    username = message.from_user.username
+    hint = ""
+
+    if username:
+        hint = f"\n\n💡 Вы можете просто отправить: @{username}"
+
     await message.answer(
-        "Укажите контакт для связи:",
-        reply_markup=contact_method_inline_kb()
+        "📞 Укажите контакт для связи:\n\n"
+        "Можно указать:\n"
+        "• телефон\n"
+        "• @username\n"
+        "• WhatsApp / Telegram"
+        f"{hint}"
     )
 
-    await AdForm.contact_method.set()
+    await AdForm.contact.set()
+
 
 
 
@@ -560,9 +562,28 @@ async def process_contact_share(message: types.Message, state: FSMContext):
 async def process_contact_manual(message: types.Message, state: FSMContext):
     contact = message.text.strip()
 
+    if len(contact) < 5:
+        await message.answer(
+            "❗ Контакт слишком короткий.\n"
+            "Пожалуйста, укажите телефон или @username."
+        )
+        return
+
+    warning = ""
+    if not is_phone(contact) and not is_username(contact):
+        warning = (
+            "\n\n⚠️ Обратите внимание:\n"
+            "Формат контакта нестандартный, но мы всё равно сохранили его."
+        )
+
     await state.update_data(contact=contact)
+
+    if warning:
+        await message.answer(warning)
+
     await show_preview(message, state)
     await AdForm.preview.set()
+
 
 
 
