@@ -29,11 +29,11 @@ def media_done_inline_kb():
 # НИЖНЕЕ МЕНЮ
 # =========================
 
-keyboard = ReplyKeyboardMarkup(resize_keyboard=True)
-keyboard.add("Разместить объявление")
-keyboard.add("Связаться с администратором")
-keyboard.add("ПРОДАЖА смотреть объявления")
-keyboard.add("АРЕНДА смотреть объявления")
+# keyboard = ReplyKeyboardMarkup(resize_keyboard=True)
+# keyboard.add("Разместить объявление")
+# keyboard.add("Связаться с администратором")
+# keyboard.add("ПРОДАЖА смотреть объявления")
+# keyboard.add("АРЕНДА смотреть объявления")
 
 
 # =========================
@@ -57,7 +57,7 @@ class AdForm(StatesGroup):
 
 
 # =========================
-# INLINE-КЛАВИАТУР ГЛАВНОГО МЕНЮ
+# INLINE-КЛАВИАТУРА ГЛАВНОГО МЕНЮ
 # =========================
 
 def main_menu_inline_kb():
@@ -67,6 +67,29 @@ def main_menu_inline_kb():
         InlineKeyboardButton("Связаться с администратором", callback_data="menu_contact"),
         InlineKeyboardButton("ПРОДАЖА смотреть объявления", callback_data="menu_sale"),
         InlineKeyboardButton("АРЕНДА смотреть объявления", callback_data="menu_rent"),
+    )
+    return kb
+
+
+# =========================
+# INLINE-КЛАВИАТУРА выбора контакта
+# =========================
+
+def contact_method_inline_kb():
+    kb = InlineKeyboardMarkup(row_width=1)
+    kb.add(
+        InlineKeyboardButton(
+            "Поделиться номером",
+            callback_data="contact_share"
+        ),
+        InlineKeyboardButton(
+            "Ввести вручную",
+            callback_data="contact_manual"
+        ),
+        InlineKeyboardButton(
+            "Отмена",
+            callback_data="cancel_ad"
+        )
     )
     return kb
 
@@ -158,11 +181,11 @@ def cancel_inline_kb():
 @dp.message_handler(commands=["start"], state="*")
 async def start(message: types.Message, state: FSMContext):
     await state.finish()
+    await message.answer(
+        "Добро пожаловать!\nВыберите действие:",
+        reply_markup=main_menu_inline_kb()
+    )
 
-await message.answer(
-    "Добро пожаловать!\nВыберите действие:",
-    reply_markup=main_menu_inline_kb()
-)
 
 
 
@@ -217,7 +240,7 @@ async def cancel(message: types.Message, state: FSMContext):
     await state.finish()
     await message.answer(
         "Действие отменено.\nВыберите действие:",
-        reply_markup=keyboard
+        reply_markup=main_menu_inline_kb()
     )
 
 
@@ -437,29 +460,27 @@ async def process_media(message: types.Message, state: FSMContext):
     media = data.get("media", [])
 
     if len(media) >= 10:
-        await message.answer("⛔ Можно добавить не более 10 файлов (фото + видео).")
+        await message.answer("⛔ Можно добавить не более 10 файлов.")
         return
 
     if message.content_type == types.ContentType.PHOTO:
-        file_id = message.photo[-1].file_id
         media.append({
             "type": "photo",
-            "file_id": file_id
+            "file_id": message.photo[-1].file_id
         })
-
-    elif message.content_type == types.ContentType.VIDEO:
-        file_id = message.video.file_id
+    else:
         media.append({
             "type": "video",
-            "file_id": file_id
+            "file_id": message.video.file_id
         })
 
     await state.update_data(media=media)
 
-   await message.answer(
-    f"✅ Добавлено ({len(media)}/10)",
-    reply_markup=media_done_inline_kb()
-)
+    await message.answer(
+        f"✅ Добавлено ({len(media)}/10)\n\nДобавьте ещё или нажмите «Готово»",
+        reply_markup=media_done_inline_kb()
+    )
+
 
 
 
@@ -477,33 +498,55 @@ async def media_done(callback: types.CallbackQuery, state: FSMContext):
 
 
 
+    # клавиатура контакта
+
 @dp.message_handler(state=AdForm.price)
 async def process_price(message: types.Message, state: FSMContext):
     price = message.text.strip()
-
-
     await state.update_data(price=price)
-
-    # клавиатура контакта
-    contact_kb = ReplyKeyboardMarkup(
-        resize_keyboard=True,
-        one_time_keyboard=True
-    )
-    contact_kb.add(
-        types.KeyboardButton("Поделиться номером", request_contact=True)
-    )
-    contact_kb.add("Ввести вручную")
 
     await message.answer(
         "Укажите контакт для связи:",
-        reply_markup=contact_kb
+        reply_markup=contact_method_inline_kb()
     )
 
     await AdForm.contact_method.set()
 
 
 
-@dp.message_handler(content_types=types.ContentType.CONTACT, state=AdForm.contact_method)
+@dp.callback_query_handler(
+    lambda c: c.data == "contact_share",
+    state=AdForm.contact_method
+)
+async def contact_share(callback: types.CallbackQuery, state: FSMContext):
+    await callback.answer()
+
+    await callback.message.answer(
+        "Пожалуйста, отправьте контакт, используя кнопку «Поделиться контактом» "
+        "в Telegram или введите номер вручную."
+    )
+
+
+@dp.callback_query_handler(
+    lambda c: c.data == "contact_manual",
+    state=AdForm.contact_method
+)
+async def contact_manual(callback: types.CallbackQuery, state: FSMContext):
+    await callback.answer()
+
+    await callback.message.answer(
+        "Введите контакт для связи в свободной форме:"
+    )
+
+    await AdForm.contact.set()
+
+
+
+  
+@dp.message_handler(
+    content_types=types.ContentType.CONTACT,
+    state=AdForm.contact_method
+)
 async def process_contact_share(message: types.Message, state: FSMContext):
     contact = message.contact.phone_number
     await state.update_data(contact=contact)
@@ -513,15 +556,6 @@ async def process_contact_share(message: types.Message, state: FSMContext):
 
 
 
-@dp.message_handler(lambda m: m.text == "Ввести вручную", state=AdForm.contact_method)
-async def contact_manual_start(message: types.Message, state: FSMContext):
-    await message.answer(
-        "Введите контакт для связи в свободной форме:",
-        reply_markup=types.ReplyKeyboardRemove()
-    )
-    await AdForm.contact.set()
-
-
 @dp.message_handler(state=AdForm.contact)
 async def process_contact_manual(message: types.Message, state: FSMContext):
     contact = message.text.strip()
@@ -529,42 +563,6 @@ async def process_contact_manual(message: types.Message, state: FSMContext):
     await state.update_data(contact=contact)
     await show_preview(message, state)
     await AdForm.preview.set()
-
-
-
-
-async def finalize_ad(message: types.Message, state: FSMContext, contact: str):
-    data = await state.get_data()
-
-    text = (
-        "📋 <b>Проверьте данные объявления:</b>\n\n"
-        f"🔹 Тип сделки: {data['type']}\n"
-        f"🔹 Назначение: {data['purpose']}\n"
-        f"🔹 Площадь: {data['area']} м²\n"
-        f"🔹 Район: {data['district']}\n"
-        f"🔹 Адрес: {data['address']}\n"
-        f"🔹 Цена: {data['price']}\n\n"
-        f"📝 Описание:\n{data['description']}\n\n"
-        f"📞 Контакт: {contact}"
-    )
-
-    confirm_kb = InlineKeyboardMarkup()
-    confirm_kb.add(
-        InlineKeyboardButton("Отправить на модерацию", callback_data="send_moderation"),
-        InlineKeyboardButton("Исправить", callback_data="edit_ad")
-    )
-
-    await state.update_data(contact=contact)
-
-    await message.answer(
-        text,
-        reply_markup=confirm_kb,
-        parse_mode="HTML"
-    )
-
-
-    await AdForm.preview.set()
-
 
 
 
@@ -632,14 +630,7 @@ async def send_to_moderation(callback: types.CallbackQuery, state: FSMContext):
 
     await state.finish()
 
-    await callback.message.answer(
-        "Вы можете разместить новое объявление или выбрать другое действие:",
-        reply_markup=keyboard
-    )
-
-
-
-
+    
 
 @dp.callback_query_handler(lambda c: c.data == "approve_ad", state="*")
 async def approve_ad(callback: types.CallbackQuery):
@@ -754,7 +745,7 @@ async def cancel_ad_callback(callback: types.CallbackQuery, state: FSMContext):
     await callback.message.answer(
         "❌ Размещение объявления отменено.\n\n"
         "Выберите действие:",
-        reply_markup=keyboard
+        reply_markup=main_menu_inline_kb()
     )
 
 
