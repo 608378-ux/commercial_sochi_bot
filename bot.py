@@ -55,6 +55,23 @@ class AdForm(StatesGroup):
     edit = State()
 
 
+
+# =========================
+# INLINE-КЛАВИАТУР ГЛАВНОГО МЕНЮ
+# =========================
+
+def main_menu_inline_kb():
+    kb = InlineKeyboardMarkup(row_width=1)
+    kb.add(
+        InlineKeyboardButton("Разместить объявление", callback_data="menu_add"),
+        InlineKeyboardButton("Связаться с администратором", callback_data="menu_contact"),
+        InlineKeyboardButton("ПРОДАЖА смотреть объявления", callback_data="menu_sale"),
+        InlineKeyboardButton("АРЕНДА смотреть объявления", callback_data="menu_rent"),
+    )
+    return kb
+
+
+
 # =========================
 # КЛАВИАТУРЫ ОПРОСНИКА
 # =========================
@@ -142,10 +159,53 @@ def cancel_inline_kb():
 async def start(message: types.Message, state: FSMContext):
     await state.finish()
 
-    await message.answer(
-        "Добро пожаловать!\nВыберите действие:",
-        reply_markup=keyboard
-    )
+await message.answer(
+    "Добро пожаловать!\nВыберите действие:",
+    reply_markup=main_menu_inline_kb()
+)
+
+
+
+@dp.callback_query_handler(
+    lambda c: c.data.startswith("menu_"),
+    state="*"
+)
+async def main_menu_handler(callback: types.CallbackQuery, state: FSMContext):
+    await callback.answer()
+
+    if callback.data == "menu_add":
+        await start_ad_flow(callback.message, state)
+
+    elif callback.data == "menu_contact":
+        await callback.message.answer(
+            "📞 Контакты администратора:\n\n"
+            "Телефон: +7 938 400-05-58\n"
+            "Telegram: https://t.me/moder_com"
+        )
+
+    elif callback.data == "menu_sale":
+        kb = InlineKeyboardMarkup().add(
+            InlineKeyboardButton(
+                "Открыть объявления о продаже",
+                url="https://t.me/sochi_commerc/4"
+            )
+        )
+        await callback.message.answer(
+            "Продажа коммерческой недвижимости:",
+            reply_markup=kb
+        )
+
+    elif callback.data == "menu_rent":
+        kb = InlineKeyboardMarkup().add(
+            InlineKeyboardButton(
+                "Открыть объявления об аренде",
+                url="https://t.me/sochi_commerc/3"
+            )
+        )
+        await callback.message.answer(
+            "Аренда коммерческой недвижимости:",
+            reply_markup=kb
+        )
 
 
 # =========================
@@ -363,11 +423,8 @@ async def process_description(message: types.Message, state: FSMContext):
     await state.update_data(description=description)
     await state.update_data(media=[])
     await message.answer(
-        "Добавьте фото и/или видео объекта (до 10 шт).\n"
-        "Когда закончите — нажмите «Готово».",
-        reply_markup=media_done_inline_kb()
+        "Добавьте фото и/или видео объекта (до 10 шт)."          
     )
-
     await AdForm.media.set()
 
 
@@ -399,7 +456,11 @@ async def process_media(message: types.Message, state: FSMContext):
 
     await state.update_data(media=media)
 
-    await message.answer(f"✅ Добавлено ({len(media)}/10)")
+   await message.answer(
+    f"✅ Добавлено ({len(media)}/10)",
+    reply_markup=media_done_inline_kb()
+)
+
 
 
 @dp.callback_query_handler(lambda c: c.data == "media_done", state=AdForm.media)
