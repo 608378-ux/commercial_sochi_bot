@@ -4,6 +4,7 @@ from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters.state import State, StatesGroup
 from aiogram.types import ReplyKeyboardMarkup, InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import InputMediaPhoto, InputMediaVideo
 
 API_TOKEN = os.getenv("BOT_TOKEN")
 
@@ -14,10 +15,13 @@ storage = MemoryStorage()
 dp = Dispatcher(bot, storage=storage)
 
 
-media_done_kb = ReplyKeyboardMarkup(
-    resize_keyboard=True
-)
-media_done_kb.add("Готово")
+def media_done_inline_kb():
+    kb = InlineKeyboardMarkup()
+    kb.add(
+        InlineKeyboardButton("✅ Готово", callback_data="media_done")
+    )
+    return kb
+
 
 
 
@@ -117,6 +121,20 @@ def edit_menu_kb():
 
 
 # =========================
+# inline-кнопка «Отмена»
+# =========================
+
+def cancel_inline_kb():
+    kb = InlineKeyboardMarkup()
+    kb.add(
+        InlineKeyboardButton("❌ Отмена", callback_data="cancel_ad")
+    )
+    return kb
+
+
+
+
+# =========================
 # /start
 # =========================
 
@@ -152,7 +170,7 @@ async def contact_admin(message: types.Message):
     await message.answer(
         "📞 Контакты администратора:\n\n"
         "Телефон: +7 938 400-05-58\n"
-        "Telegram: https://t.me/Svetla_Sochi\n"
+        "Telegram: https://t.me/moder_com\n" 
        
     )
 
@@ -345,9 +363,9 @@ async def process_description(message: types.Message, state: FSMContext):
     await state.update_data(description=description)
     await state.update_data(media=[])
     await message.answer(
-        "📸 Добавьте фото и/или видео объекта (до 10 шт).\n"
+        "Добавьте фото и/или видео объекта (до 10 шт).\n"
         "Когда закончите — нажмите «Готово».",
-        reply_markup=media_done_kb
+        reply_markup=media_done_inline_kb()
     )
 
     await AdForm.media.set()
@@ -384,23 +402,17 @@ async def process_media(message: types.Message, state: FSMContext):
     await message.answer(f"✅ Добавлено ({len(media)}/10)")
 
 
-
-
-@dp.message_handler(lambda m: m.text == "Готово", state=AdForm.media)
-async def media_done(message: types.Message, state: FSMContext):
+@dp.callback_query_handler(lambda c: c.data == "media_done", state=AdForm.media)
+async def media_done(callback: types.CallbackQuery, state: FSMContext):
+    await callback.answer()
     data = await state.get_data()
 
     if not data.get("media"):
-        await message.answer("❗ Добавьте хотя бы одно фото.")
+        await callback.message.answer("❗ Добавьте хотя бы одно фото или видео.")
         return
 
-    await message.answer(
-        "Введите цену объекта :\n\n",
-        reply_markup=types.ReplyKeyboardRemove()
-    )
-
+    await callback.message.answer("Введите цену объекта:")
     await AdForm.price.set()
-
 
 
 
@@ -529,53 +541,36 @@ async def send_to_moderation(callback: types.CallbackQuery, state: FSMContext):
         InlineKeyboardButton("❌ Отклонить", callback_data="reject_ad")
     )
 
-    media = data.get("media", [])
+data = await state.get_data()
+media = data.get("media", [])
 
-    # если медиа нет
-    if not media:
-        await bot.send_message(
-            chat_id=MODERATION_CHAT_ID,
-            text=text,
-            reply_markup=moderation_kb,
-            parse_mode="HTML"
-        )
-    else:
-        # первое медиа — с кнопками
-        first = media[0]
+# 1️⃣ сначала текст + кнопки
+await bot.send_message(
+    chat_id=MODERATION_CHAT_ID,
+    text=text,
+    reply_markup=moderation_kb,
+    parse_mode="HTML"
+)
 
-        if first["type"] == "photo":
-            await bot.send_photo(
-                chat_id=MODERATION_CHAT_ID,
-                photo=first["file_id"],
-                caption=text,
-                reply_markup=moderation_kb,
-                parse_mode="HTML"
+# 2️⃣ затем альбом (если есть медиа)
+if media:
+    album = []
+
+    for item in media:
+        if item["type"] == "photo":
+            album.append(
+                InputMediaPhoto(media=item["file_id"])
             )
-        elif first["type"] == "video":
-            await bot.send_video(
-                chat_id=MODERATION_CHAT_ID,
-                video=first["file_id"],
-                caption=text,
-                reply_markup=moderation_kb,
-                parse_mode="HTML"
+        elif item["type"] == "video":
+            album.append(
+                InputMediaVideo(media=item["file_id"])
             )
 
-        # остальные — с подписью, без кнопок
-        for item in media[1:]:
-            if item["type"] == "photo":
-                await bot.send_photo(
-                    chat_id=MODERATION_CHAT_ID,
-                    photo=item["file_id"],
-                    caption=text,
-                    parse_mode="HTML"
-                )
-            elif item["type"] == "video":
-                await bot.send_video(
-                    chat_id=MODERATION_CHAT_ID,
-                    video=item["file_id"],
-                    caption=text,
-                    parse_mode="HTML"
-                )
+    await bot.send_media_group(
+        chat_id=MODERATION_CHAT_ID,
+        media=album
+    )
+
 
     await callback.message.answer(
         "Спасибо! Ваше объявление отправлено на модерацию.\n"
@@ -676,10 +671,37 @@ async def show_preview(message: types.Message, state: FSMContext):
         InlineKeyboardButton("Исправить", callback_data="edit_ad")
     )
 
-    await message.answer(text, reply_markup=confirm_kb, parse_mode="HTML")
+    # 1️⃣ текст
+    await message.answer(text, parse_mode="HTML")
 
+    # 2️⃣ альбом
+    media = data.get("media", [])
+    if media:
+        album = []
+        for item in media:
+            if item["type"] == "photo":
+                album.append(InputMediaPhoto(media=item["file_id"]))
+            elif item["type"] == "video":
+                album.append(InputMediaVideo(media=item["file_id"]))
 
+        await message.answer_media_group(album)
 
+    # 3️⃣ кнопки
+    await message.answer(
+        "Всё верно?",
+        reply_markup=confirm_kb
+    )
+
+@dp.callback_query_handler(lambda c: c.data == "cancel_ad", state="*")
+async def cancel_ad_callback(callback: types.CallbackQuery, state: FSMContext):
+    await callback.answer("Отменено")
+    await state.finish()
+
+    await callback.message.answer(
+        "❌ Размещение объявления отменено.\n\n"
+        "Выберите действие:",
+        reply_markup=keyboard
+    )
 
 
 # =========================
