@@ -521,7 +521,9 @@ async def edit_ad(callback: types.CallbackQuery, state: FSMContext):
 @dp.callback_query_handler(lambda c: c.data == "send_moderation", state=AdForm.preview)
 async def send_to_moderation(callback: types.CallbackQuery, state: FSMContext):
     await callback.answer()
+
     data = await state.get_data()
+    media = data.get("media", [])
 
     text = (
         "🆕 <b>НОВОЕ ОБЪЯВЛЕНИЕ НА МОДЕРАЦИЮ</b>\n\n"
@@ -535,42 +537,32 @@ async def send_to_moderation(callback: types.CallbackQuery, state: FSMContext):
         f"📞 Контакт: {data['contact']}"
     )
 
-    moderation_kb = InlineKeyboardMarkup()
-    moderation_kb.add(
-        InlineKeyboardButton("✅ Одобрить", callback_data="approve_ad"),
-        InlineKeyboardButton("❌ Отклонить", callback_data="reject_ad")
+    moderation_kb = InlineKeyboardMarkup().add(
+        InlineKeyboardButton("Одобрить", callback_data="approve_ad"),
+        InlineKeyboardButton("Отклонить", callback_data="reject_ad")
     )
 
-data = await state.get_data()
-media = data.get("media", [])
-
-# 1️⃣ сначала текст + кнопки
-await bot.send_message(
-    chat_id=MODERATION_CHAT_ID,
-    text=text,
-    reply_markup=moderation_kb,
-    parse_mode="HTML"
-)
-
-# 2️⃣ затем альбом (если есть медиа)
-if media:
-    album = []
-
-    for item in media:
-        if item["type"] == "photo":
-            album.append(
-                InputMediaPhoto(media=item["file_id"])
-            )
-        elif item["type"] == "video":
-            album.append(
-                InputMediaVideo(media=item["file_id"])
-            )
-
-    await bot.send_media_group(
-        chat_id=MODERATION_CHAT_ID,
-        media=album
+    # 1️⃣ сначала текст + кнопки
+    await bot.send_message(
+        MODERATION_CHAT_ID,
+        text,
+        reply_markup=moderation_kb,
+        parse_mode="HTML"
     )
 
+    # 2️⃣ затем альбом (ОДНО объявление, НЕ несколько)
+    if media:
+        album = []
+        for item in media:
+            if item["type"] == "photo":
+                album.append(InputMediaPhoto(media=item["file_id"]))
+            elif item["type"] == "video":
+                album.append(InputMediaVideo(media=item["file_id"]))
+
+        await bot.send_media_group(
+            chat_id=MODERATION_CHAT_ID,
+            media=album
+        )
 
     await callback.message.answer(
         "Спасибо! Ваше объявление отправлено на модерацию.\n"
@@ -583,6 +575,7 @@ if media:
         "Вы можете разместить новое объявление или выбрать другое действие:",
         reply_markup=keyboard
     )
+
 
 
 
