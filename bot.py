@@ -14,10 +14,10 @@ storage = MemoryStorage()
 dp = Dispatcher(bot, storage=storage)
 
 
-photos_done_kb = ReplyKeyboardMarkup(
+media_done_kb = ReplyKeyboardMarkup(
     resize_keyboard=True
 )
-photos_done_kb.add("Готово")
+media_done_kb.add("Готово")
 
 
 
@@ -108,7 +108,7 @@ def edit_menu_kb():
         InlineKeyboardButton("Адрес", callback_data="edit_address"),
         InlineKeyboardButton("Описание", callback_data="edit_description"),
         InlineKeyboardButton("Цена", callback_data="edit_price"),
-        InlineKeyboardButton("Медиа", callback_data="edit_photos"),
+        InlineKeyboardButton("Медиа", callback_data="edit_media"),
     )
     kb.add(
         InlineKeyboardButton("⬅️ Назад", callback_data="edit_back")
@@ -347,15 +347,15 @@ async def process_description(message: types.Message, state: FSMContext):
     await message.answer(
         "📸 Добавьте фото и/или видео объекта (до 10 шт).\n"
         "Когда закончите — нажмите «Готово».",
-        reply_markup=photos_done_kb
+        reply_markup=media_done_kb
     )
 
-    await AdForm.photos.set()
+    await AdForm.media.set()
 
 
 @dp.message_handler(
     content_types=[types.ContentType.PHOTO, types.ContentType.VIDEO],
-    state=AdForm.photos
+    state=AdForm.media
 )
 async def process_media(message: types.Message, state: FSMContext):
     data = await state.get_data()
@@ -386,8 +386,8 @@ async def process_media(message: types.Message, state: FSMContext):
 
 
 
-@dp.message_handler(lambda m: m.text == "Готово", state=AdForm.photos)
-async def photos_done(message: types.Message, state: FSMContext):
+@dp.message_handler(lambda m: m.text == "Готово", state=AdForm.media)
+async def media_done(message: types.Message, state: FSMContext):
     data = await state.get_data()
 
     if not data.get("media"):
@@ -625,7 +625,7 @@ async def choose_edit_field(callback: types.CallbackQuery, state: FSMContext):
         "address": "Введите новый адрес:",
         "description": "Введите новое описание:",
         "price": "Введите новую цену:",
-        "photos": "Отправьте новые фото (старые будут удалены)",
+        "media": "Отправьте новые фото (старые будут удалены)",
     }
 
     await callback.message.answer(prompts[field])
