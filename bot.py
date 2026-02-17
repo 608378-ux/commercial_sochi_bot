@@ -256,7 +256,7 @@ async def main_menu_handler(callback: types.CallbackQuery, state: FSMContext):
         await callback.message.answer(
             "📞 Контакты администратора:\n\n"
             "Телефон: +7 938 400-05-58\n"
-            "Telegram: https://t.me/moder_com"
+            "Telegram: https://t.me/Svetla_Sochi"
         )
 
     elif callback.data == "menu_sale":
@@ -306,7 +306,7 @@ async def contact_admin(message: types.Message):
     await message.answer(
         "📞 Контакты администратора:\n\n"
         "Телефон: +7 938 400-05-58\n"
-        "Telegram: https://t.me/moder_com\n" 
+        "Telegram: https://t.me/Svetla_Sochi\n" 
        
     )
 
@@ -964,3 +964,4 @@ async def media_edit_back(callback: types.CallbackQuery, state: FSMContext):
 
 if __name__ == "__main__":
     executor.start_polling(dp, skip_updates=True)
+
