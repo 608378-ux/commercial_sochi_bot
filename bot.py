@@ -24,12 +24,12 @@ MOD_QUEUE = {}  # key: moderation_message_id -> {"data": dict, "media": list}
 
 
 
-def media_done_inline_kb():
+def media_edit_inline_kb():
     kb = InlineKeyboardMarkup()
-    kb.add(
-        InlineKeyboardButton("✅ Готово", callback_data="media_done")
-    )
+    kb.add(InlineKeyboardButton("✅ Готово", callback_data="media_done"))
+    kb.add(InlineKeyboardButton("⬅️ Назад", callback_data="media_edit_back"))
     return kb
+
 
 
 
@@ -522,10 +522,13 @@ async def process_media(message: types.Message, state: FSMContext):
 
     await state.update_data(media=media)
 
+    kb = media_edit_inline_kb() if data.get("editing_media") else media_done_inline_kb()
+
     await message.answer(
         f"✅ Добавлено ({len(media)}/10)\n\nДобавьте ещё или нажмите «Готово»",
-        reply_markup=media_done_inline_kb()
+        reply_markup=kb
     )
+
 
 
 
@@ -819,7 +822,7 @@ async def choose_edit_field(callback: types.CallbackQuery, state: FSMContext):
         await AdForm.preview.set()
         return
 
-    # ✅ ВОТ ЭТО ДОБАВИТЬ
+ 
     if field == "media":
         await callback.answer()
         # очищаем старые медиа
@@ -830,7 +833,7 @@ async def choose_edit_field(callback: types.CallbackQuery, state: FSMContext):
         await callback.message.answer(
             "Отправьте новые фото/видео (до 10). Старые будут удалены.\n"
             "Когда закончите — нажмите «✅ Готово».",
-            reply_markup=media_done_inline_kb()
+            reply_markup=media_edit_inline_kb()
         )
         await AdForm.media.set()
         return
@@ -930,6 +933,20 @@ async def cancel_ad_callback(callback: types.CallbackQuery, state: FSMContext):
         "Выберите действие:",
         reply_markup=main_menu_inline_kb()
     )
+
+
+
+
+@dp.callback_query_handler(lambda c: c.data == "media_edit_back", state=AdForm.media)
+async def media_edit_back(callback: types.CallbackQuery, state: FSMContext):
+    await callback.answer()
+    data = await state.get_data()
+
+    if data.get("editing_media"):
+        await state.update_data(editing_media=False)
+        await show_preview(callback.message, state)
+        await AdForm.preview.set()
+
 
 
 # =========================
