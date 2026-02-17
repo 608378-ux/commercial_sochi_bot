@@ -10,9 +10,18 @@ API_TOKEN = os.getenv("BOT_TOKEN")
 
 MODERATION_CHAT_ID = -1003846593729
 
+PUBLIC_GROUP_ID = -1003844187449  # id группы sochi_commerc (НЕ чат модерации!)
+SALE_TOPIC_ID = 4                 # t.me/sochi_commerc/4
+RENT_TOPIC_ID = 3                 # t.me/sochi_commerc/3
+
+
 bot = Bot(token=API_TOKEN)
 storage = MemoryStorage()
 dp = Dispatcher(bot, storage=storage)
+
+
+MOD_QUEUE = {}  # key: moderation_message_id -> {"data": dict, "media": list}
+
 
 
 def media_done_inline_kb():
@@ -163,6 +172,52 @@ def is_phone(text: str) -> bool:
 
 def is_username(text: str) -> bool:
     return bool(re.fullmatch(r"@[A-Za-z0-9_]{5,32}", text))
+
+
+
+
+# =========================
+# Хештеги (функция)
+# =========================
+
+def build_hashtags(data: dict) -> str:
+    tags = []
+
+    # тип сделки
+    if data.get("type") == "Продажа":
+        tags.append("#продажа")
+    elif data.get("type") == "Аренда":
+        tags.append("#аренда")
+
+    # назначение
+    purpose_map = {
+        "Свободного назначения": "#свободногоназначения",
+        "Торговая площадь": "#торговаяплощадь",
+        "Офисная недвижимость": "#офис",
+        "Гостиничная недвижимость": "#гостиница",
+        "Склады": "#склад",
+        "Производственные помещения": "#производство",
+        "Другое": "#другое",
+    }
+    if data.get("purpose") in purpose_map:
+        tags.append(purpose_map[data["purpose"]])
+
+    # район
+    district_map = {
+        "Адлерский": "#адлер",
+        "Хостинский": "#хоста",
+        "Лазаревский": "#лазаревское",
+        "Центральный": "#центр",
+        "Сириус": "#сириус",
+        "Красная Поляна": "#краснаяполяна",
+    }
+    if data.get("district") in district_map:
+        tags.append(district_map[data["district"]])
+
+    tags += ["#коммерческаянедвижимость", "#сочи"]
+    return " ".join(tags)
+
+
 
 
 # =========================
@@ -617,10 +672,28 @@ async def send_to_moderation(callback: types.CallbackQuery, state: FSMContext):
         f"📞 Контакт: {data['contact']}"
     )
 
-    moderation_kb = InlineKeyboardMarkup().add(
-        InlineKeyboardButton("Одобрить", callback_data="approve_ad"),
-        InlineKeyboardButton("Отклонить", callback_data="reject_ad")
+    moderation_kb = InlineKeyboardMarkup(row_width=1)
+    moderation_kb.add(
+        InlineKeyboardButton("Опубликовать в ПРОДАЖУ", callback_data="publish_sale"),
+        InlineKeyboardButton("Опубликовать в АРЕНДУ", callback_data="publish_rent"),
+        InlineKeyboardButton("❌ Отклонить", callback_data="reject_ad"),
     )
+
+
+    mod_msg = await bot.send_message(
+        chat_id=MODERATION_CHAT_ID,
+        text=text,
+        reply_markup=moderation_kb,
+        parse_mode="HTML"
+    )
+
+    MOD_QUEUE[mod_msg.message_id] = {
+        "data": data,
+        "media": media
+    }
+
+
+
 
     # 1️⃣ сначала текст + кнопки
     await bot.send_message(
@@ -651,7 +724,7 @@ async def send_to_moderation(callback: types.CallbackQuery, state: FSMContext):
 
     await state.finish()
 
-    
+
 
 @dp.callback_query_handler(lambda c: c.data == "approve_ad", state="*")
 async def approve_ad(callback: types.CallbackQuery):
@@ -662,6 +735,74 @@ async def approve_ad(callback: types.CallbackQuery):
 async def reject_ad(callback: types.CallbackQuery):
     await callback.answer("Объявление отклонено")
     await callback.message.reply("❌ Объявление отклонено")
+
+
+# =========================
+# Хендлеры публикации в темы
+# =========================
+
+@dp.callback_query_handler(lambda c: c.data in ["publish_sale", "publish_rent"], state="*")
+async def publish_to_topic(callback: types.CallbackQuery):
+    await callback.answer("Публикую…")
+
+    item = MOD_QUEUE.get(callback.message.message_id)
+    if not item:
+        await callback.message.reply("⚠️ Не нашёл данные объявления (возможно бот перезапускался). Попросите пользователя отправить заново.")
+        return
+
+    data = item["data"]
+    media = item["media"]
+
+    topic_id = SALE_TOPIC_ID if callback.data == "publish_sale" else RENT_TOPIC_ID
+
+    post_text = (
+        f"<b>{data.get('type')}</b>\n"
+        f"🔹 Назначение: {data.get('purpose')}\n"
+        f"🔹 Площадь: {data.get('area')} м²\n"
+        f"🔹 Район: {data.get('district')}\n"
+        f"🔹 Адрес: {data.get('address')}\n"
+        f"🔹 Цена: {data.get('price')}\n\n"
+        f"📝 {data.get('description')}\n\n"
+        f"📞 {data.get('contact')}\n\n"
+        f"{build_hashtags(data)}"
+    )
+
+    # 1) Если нет медиа — просто сообщение в тему
+    if not media:
+        await bot.send_message(
+            chat_id=PUBLIC_GROUP_ID,
+            message_thread_id=topic_id,
+            text=post_text,
+            parse_mode="HTML"
+        )
+    else:
+        # 2) Если есть медиа — альбом в тему
+        album = []
+        for i, m in enumerate(media):
+            if m["type"] == "photo":
+                if i == 0:
+                    album.append(InputMediaPhoto(media=m["file_id"], caption=post_text, parse_mode="HTML"))
+                else:
+                    album.append(InputMediaPhoto(media=m["file_id"]))
+            elif m["type"] == "video":
+                if i == 0:
+                    album.append(InputMediaVideo(media=m["file_id"], caption=post_text, parse_mode="HTML"))
+                else:
+                    album.append(InputMediaVideo(media=m["file_id"]))
+
+        await bot.send_media_group(
+            chat_id=PUBLIC_GROUP_ID,
+            message_thread_id=topic_id,
+            media=album
+        )
+
+    # убираем кнопки у модераторского сообщения
+    await callback.message.edit_reply_markup()
+    await callback.message.reply("✅ Опубликовано в нужную тему.")
+
+    # можно чистить кэш
+    MOD_QUEUE.pop(callback.message.message_id, None)
+
 
 
 
