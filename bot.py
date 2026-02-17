@@ -31,6 +31,13 @@ def media_edit_inline_kb():
     return kb
 
 
+def media_done_inline_kb():
+    kb = InlineKeyboardMarkup()
+    kb.add(
+        InlineKeyboardButton("✅ Готово", callback_data="media_done")
+    )
+    return kb
+
 
 
 
