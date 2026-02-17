@@ -529,7 +529,6 @@ async def process_media(message: types.Message, state: FSMContext):
 
 
 
-
 @dp.callback_query_handler(lambda c: c.data == "media_done", state=AdForm.media)
 async def media_done(callback: types.CallbackQuery, state: FSMContext):
     await callback.answer()
@@ -539,8 +538,18 @@ async def media_done(callback: types.CallbackQuery, state: FSMContext):
         await callback.message.answer("❗ Добавьте хотя бы одно фото или видео.")
         return
 
+    # ✅ если редактировали медиа — возвращаемся в preview
+    if data.get("editing_media"):
+        await state.update_data(editing_media=False)
+        await callback.message.answer("✅ Медиа обновлено.")
+        await show_preview(callback.message, state)
+        await AdForm.preview.set()
+        return
+
+    # обычный сценарий (первичное заполнение)
     await callback.message.answer("Введите цену объекта:")
     await AdForm.price.set()
+
 
 
 
@@ -653,6 +662,7 @@ async def edit_ad(callback: types.CallbackQuery, state: FSMContext):
 
 
 
+
 @dp.callback_query_handler(lambda c: c.data == "send_moderation", state=AdForm.preview)
 async def send_to_moderation(callback: types.CallbackQuery, state: FSMContext):
     await callback.answer()
@@ -679,7 +689,7 @@ async def send_to_moderation(callback: types.CallbackQuery, state: FSMContext):
         InlineKeyboardButton("❌ Отклонить", callback_data="reject_ad"),
     )
 
-
+    # 1) Одно сообщение с текстом + кнопками (ГЛАВНОЕ)
     mod_msg = await bot.send_message(
         chat_id=MODERATION_CHAT_ID,
         text=text,
@@ -687,23 +697,10 @@ async def send_to_moderation(callback: types.CallbackQuery, state: FSMContext):
         parse_mode="HTML"
     )
 
-    MOD_QUEUE[mod_msg.message_id] = {
-        "data": data,
-        "media": media
-    }
+    # сохраняем по message_id именно этого сообщения
+    MOD_QUEUE[mod_msg.message_id] = {"data": data, "media": media}
 
-
-
-
-    # 1️⃣ сначала текст + кнопки
-    await bot.send_message(
-        MODERATION_CHAT_ID,
-        text,
-        reply_markup=moderation_kb,
-        parse_mode="HTML"
-    )
-
-    # 2️⃣ затем альбом (ОДНО объявление, НЕ несколько)
+    # 2) Альбом — ответом на модераторское сообщение (чтобы выглядело единым)
     if media:
         album = []
         for item in media:
@@ -712,17 +709,19 @@ async def send_to_moderation(callback: types.CallbackQuery, state: FSMContext):
             elif item["type"] == "video":
                 album.append(InputMediaVideo(media=item["file_id"]))
 
+        # reply_to_message_id работает у send_media_group (если твоя версия aiogram/bot api поддерживает)
         await bot.send_media_group(
             chat_id=MODERATION_CHAT_ID,
-            media=album
+            media=album,
+            reply_to_message_id=mod_msg.message_id
         )
 
     await callback.message.answer(
         "Спасибо! Ваше объявление отправлено на модерацию.\n"
-        "Мы свяжемся с вами после проверки."
+        "Мы свяжемся с Вами после проверки."
     )
-
     await state.finish()
+
 
 
 
@@ -731,10 +730,15 @@ async def approve_ad(callback: types.CallbackQuery):
     await callback.answer("Объявление одобрено")
     await callback.message.reply("✅ Объявление одобрено")
 
+
 @dp.callback_query_handler(lambda c: c.data == "reject_ad", state="*")
 async def reject_ad(callback: types.CallbackQuery):
-    await callback.answer("Объявление отклонено")
+    await callback.answer("Отклонено")
+    await callback.message.edit_reply_markup()  # убрать кнопки
     await callback.message.reply("❌ Объявление отклонено")
+
+    MOD_QUEUE.pop(callback.message.message_id, None)  # очистить кэш
+
 
 
 # =========================
@@ -805,7 +809,6 @@ async def publish_to_topic(callback: types.CallbackQuery):
 
 
 
-
 @dp.callback_query_handler(lambda c: c.data.startswith("edit_"), state=AdForm.edit)
 async def choose_edit_field(callback: types.CallbackQuery, state: FSMContext):
     field = callback.data.replace("edit_", "")
@@ -814,6 +817,22 @@ async def choose_edit_field(callback: types.CallbackQuery, state: FSMContext):
         await callback.answer()
         await show_preview(callback.message, state)
         await AdForm.preview.set()
+        return
+
+    # ✅ ВОТ ЭТО ДОБАВИТЬ
+    if field == "media":
+        await callback.answer()
+        # очищаем старые медиа
+        await state.update_data(media=[])
+        # помечаем, что мы в режиме редактирования медиа
+        await state.update_data(editing_media=True)
+
+        await callback.message.answer(
+            "Отправьте новые фото/видео (до 10). Старые будут удалены.\n"
+            "Когда закончите — нажмите «✅ Готово».",
+            reply_markup=media_done_inline_kb()
+        )
+        await AdForm.media.set()
         return
 
     await state.update_data(edit_field=field)
@@ -831,6 +850,8 @@ async def choose_edit_field(callback: types.CallbackQuery, state: FSMContext):
     }
 
     await callback.message.answer(prompts[field])
+
+
 
 
 
